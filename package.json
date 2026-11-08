@@ -30,7 +30,10 @@
     "url": "https://infinitode.netlify.app"
   },
   "bin": {
-    "tailclass": "./bin/tailclass.js"
+    "tailclass": "bin/tailclass.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "main": "./src/index.js",
   "module": "./src/index.mjs",
