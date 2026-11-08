@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Infinitode Cloud — Pricing</title>
+</head>
+<body class="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+  <!-- Notice utility order differs slightly from index.html; TailClass canonicalizes automatically! -->
+  <nav class="px-6 py-4 bg-white/90 backdrop-blur border-b border-slate-200 flex items-center justify-between sticky top-0 z-50">
+    <a href="/" class="text-xl font-bold tracking-tight text-slate-900">Infinitode</a>
+    <ul class="hidden md:flex items-center gap-6">
+      <li><a href="/" class="text-sm font-medium text-slate-600 transition hover:text-indigo-600">Home</a></li>
+      <li><a href="/pricing.html" class="text-sm font-medium text-slate-600 transition hover:text-indigo-600">Pricing</a></li>
+      <li><a href="/contact.html" class="text-sm font-medium text-slate-600 transition hover:text-indigo-600">Contact</a></li>
+    </ul>
+    <a href="/contact.html" class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500">
+      Contact Sales
+    </a>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section class="py-24 text-center">
+      <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Simple Plans</span>
+      <h1 class="mt-4 text-5xl font-extrabold tracking-tight text-slate-900">Predictable Team Pricing</h1>
+      <p class="mt-4 text-lg leading-relaxed text-slate-600">Scale from hobby repositories to enterprise design systems.</p>
+    </section>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-slate-900">Starter</h3>
+        <p class="mt-2 text-sm text-slate-600">Free forever for open-source maintainers.</p>
+        <button class="mt-6 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+          Choose Starter
+        </button>
+      </div>
+
+      <!-- Superset match: shares all 6 `.card` utilities plus `ring-2 ring-indigo-600`! -->
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm ring-2 ring-indigo-600">
+        <h3 class="text-lg font-semibold text-slate-900">Pro</h3>
+        <p class="mt-2 text-sm text-slate-600">Unlimited private repositories and CI pipelines.</p>
+        <button class="mt-6 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500">
+          Upgrade to Pro
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-200 bg-white py-12 px-6 text-sm text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">© 2026 Infinitode Pty Ltd. All rights reserved.</div>
+  </footer>
+</body>
+</html>

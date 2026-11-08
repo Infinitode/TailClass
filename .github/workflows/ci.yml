@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Schema Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run static checks
+        run: npm run lint
+
+  test:
+    name: Tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Full interpreter matrix on master/main; PRs run Node 22 for fast feedback.
+        node-version: ${{ (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && fromJSON('["18", "20", "22"]') || fromJSON('["22"]') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Run test suite
+        run: npm test
+      - name: Run sample demo
+        run: npm run demo
+
+  pack:
+    name: Verify npm package tarball
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Pack and verify distribution
+        run: |
+          npm pack --dry-run
+          npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          path: "*.tgz"

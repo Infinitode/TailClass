@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/Infinitode/TailClass/main/schema/tailclass.config.schema.json",
+  "title": "TailClass Configuration",
+  "description": "Configuration schema for TailClass (tailclass.config.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "include": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Glob patterns of files to scan across the project."
+    },
+    "exclude": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Glob patterns of files or directories to exclude."
+    },
+    "replaceDefaultExcludes": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, replaces built-in excludes (node_modules, dist, .git) instead of appending."
+    },
+    "outputCss": {
+      "type": "string",
+      "default": "tailclass.css",
+      "description": "Output path for the generated centralized Tailwind CSS file."
+    },
+    "dictionaryFile": {
+      "type": "string",
+      "default": "tailclass.map.json",
+      "description": "Path for Class List Mode dictionary output and lookup."
+    },
+    "manifestFile": {
+      "type": "string",
+      "default": ".tailclass-manifest.json",
+      "description": "Path for the revert manifest generated during apply."
+    },
+    "cssFormat": {
+      "type": "string",
+      "enum": ["tailwind-v3", "tailwind-v4", "plain"],
+      "default": "tailwind-v3",
+      "description": "Target CSS wrapper syntax for @apply rules."
+    },
+    "minOccurrences": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 2,
+      "description": "Minimum number of occurrences across the site to extract a pattern."
+    },
+    "minClasses": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 3,
+      "description": "Minimum number of Tailwind utilities required in an extractable pattern."
+    },
+    "maxClasses": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Maximum number of Tailwind utilities in a pattern (0 = no maximum)."
+    },
+    "minFiles": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Minimum number of distinct files a pattern must appear in."
+    },
+    "subsetMatching": {
+      "type": "boolean",
+      "default": true,
+      "description": "Detect shared base layouts and replace conflict-free utility subsets while keeping extra modifiers inline."
+    },
+    "subsetMinClasses": {
+      "type": "integer",
+      "minimum": 2,
+      "default": 4,
+      "description": "Minimum class count required for subset/shared-base matching."
+    },
+    "classPrefix": {
+      "type": "string",
+      "default": "",
+      "description": "Prefix prepended to every generated semantic class name (e.g. 'tc-')."
+    },
+    "namingStyle": {
+      "type": "string",
+      "enum": ["kebab", "bem", "camel"],
+      "default": "kebab",
+      "description": "Formatting style for auto-generated class names."
+    },
+    "tailwindPrefix": {
+      "type": "string",
+      "default": "",
+      "description": "Custom Tailwind utility prefix configured in your project (e.g. 'tw-')."
+    },
+    "comments": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include descriptive comments and occurrence counts in generated CSS."
+    },
+    "groupByCategory": {
+      "type": "boolean",
+      "default": true,
+      "description": "Group generated CSS selectors by UI category."
+    },
+    "scanHelpers": {
+      "type": "boolean",
+      "default": true,
+      "description": "Extract static class literals inside clsx(), cn(), twMerge(), classNames(), and cva()."
+    },
+    "strictDictionary": {
+      "type": "boolean",
+      "default": false,
+      "description": "When using a dictionary, ignore newly added repeated patterns not listed in the dictionary."
+    },
+    "excludeClasses": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Utility globs to never extract into @apply (always kept inline on elements)."
+    },
+    "includeClasses": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional allowlist of utility globs eligible for extraction."
+    },
+    "excludePatterns": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Marker classes that opt an entire element out of auto-classing (e.g. 'tc-ignore')."
+    },
+    "ignoreTags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "HTML/JSX element tags to skip during scanning."
+    },
+    "onlyTags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Restrict scanning exclusively to these HTML/JSX element tags."
+    },
+    "rules": {
+      "type": "array",
+      "description": "Custom heuristic naming rules evaluated before built-in archetypes.",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "label": { "type": "string" },
+          "matchTag": { "type": "array", "items": { "type": "string" } },
+          "matchParent": { "type": "array", "items": { "type": "string" } },
+          "mustInclude": { "type": "array", "items": { "type": "string" } },
+          "mustIncludeAny": { "type": "array", "items": { "type": "string" } },
+          "mustExclude": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "number" }
+        }
+      }
+    }
+  }
+}

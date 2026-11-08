@@ -1,0 +1,64 @@
+{
+  "name": "tailclass",
+  "version": "1.0.0",
+  "description": "An open-source Tailwind CSS auto-classer that scans sites for repeated utility layouts, assigns smart semantic component names, supports custom mapping dictionaries, and generates a centralized stylesheet.",
+  "keywords": [
+    "tailwindcss",
+    "tailwind",
+    "css",
+    "autoclasser",
+    "refactor",
+    "semantic-css",
+    "design-system",
+    "ast",
+    "cli",
+    "infinitode"
+  ],
+  "homepage": "https://github.com/Infinitode/TailClass#readme",
+  "bugs": {
+    "url": "https://github.com/Infinitode/TailClass/issues",
+    "email": "infinitode.ltd@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Infinitode/TailClass.git"
+  },
+  "license": "LicenseRef-MIT-Modified",
+  "author": {
+    "name": "Infinitode Pty Ltd",
+    "email": "infinitode.ltd@gmail.com",
+    "url": "https://infinitode.netlify.app"
+  },
+  "bin": {
+    "tailclass": "./bin/tailclass.js"
+  },
+  "main": "./src/index.js",
+  "module": "./src/index.mjs",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.mjs",
+      "require": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "types/",
+    "schema/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "lint": "node scripts/lint.js",
+    "demo": "node examples/run-demo.js",
+    "check": "npm run lint && npm test"
+  }
+}

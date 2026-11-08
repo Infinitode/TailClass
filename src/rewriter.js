@@ -1,0 +1,524 @@
+"use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+const { checkSubsetCompatibility, computePatternId } = require("./analyzer");
+const { generateStylesheet, parseExistingStylesheet } = require("./generator");
+const { toPosixPath } = require("./glob");
+const { scanSource } = require("./scanner");
+const { partitionAndCanonicalize, splitClassTokens } = require("./tailwind");
+
+/**
+ * Merge previously extracted CSS rules from an existing `tailclass.css` into
+ * `activeMappings` so incremental runs are idempotent, preserve previously
+ * extracted component classes, and rewrite newly added pages consistently.
+ *
+ * @param {Array<object>} activeMappings
+ * @param {Map<string, string>} existingCssRules
+ * @param {Record<string, any>} [config]
+ * @returns {Array<object>}
+ */
+function mergeWithExistingCssRules(activeMappings, existingCssRules, config = {}) {
+  if (!existingCssRules || existingCssRules.size === 0) {
+    return activeMappings;
+  }
+
+  const byCanonical = new Map();
+  const usedNames = new Set();
+
+  for (const m of activeMappings) {
+    byCanonical.set(m.canonicalKey, m);
+    usedNames.add(m.finalName);
+  }
+
+  const merged = [...activeMappings];
+
+  for (const [existingName, rawUtilities] of existingCssRules.entries()) {
+    const part = partitionAndCanonicalize(rawUtilities, {
+      tailwindPrefix: config.tailwindPrefix || "",
+    });
+    if (!part.canonicalKey) continue;
+
+    if (byCanonical.has(part.canonicalKey)) {
+      const current = byCanonical.get(part.canonicalKey);
+      // Keep existing CSS class name unless the user explicitly supplied a custom dictionary override
+      if (current.nameSource !== "dictionary" && current.finalName !== existingName) {
+        if (!usedNames.has(existingName)) {
+          usedNames.delete(current.finalName);
+          current.finalName = existingName;
+          current.autoName = existingName;
+          usedNames.add(existingName);
+        }
+      }
+      continue;
+    }
+
+    if (!usedNames.has(existingName)) {
+      const propGroups = new Set(part.applyableInfos.map((i) => i.propertyGroup));
+      const preserved = {
+        id: computePatternId(part.canonicalKey),
+        canonicalKey: part.canonicalKey,
+        canonicalTokens: part.canonicalTokens,
+        propGroups,
+        classCount: part.canonicalTokens.length,
+        timesFound: 0,
+        exactMatches: 0,
+        subsetMatches: 0,
+        fileCount: 0,
+        files: [],
+        elements: [],
+        occurrences: [],
+        qualifies: true,
+        autoName: existingName,
+        finalName: existingName,
+        customName: "",
+        category: "components",
+        label: existingName,
+        confidence: 1,
+        nameSource: "existing-css",
+      };
+      merged.push(preserved);
+      byCanonical.set(part.canonicalKey, preserved);
+      usedNames.add(existingName);
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Rewrite a single file's source string in memory using `activeMappings`.
+ *
+ * @param {string} source
+ * @param {string} filePath
+ * @param {Array<object>} activeMappings
+ * @param {Record<string, any>} [config]
+ */
+function rewriteSource(source, filePath, activeMappings, config = {}) {
+  const relFile = toPosixPath(filePath);
+  const scanned = scanSource(source, relFile, config);
+  const subsetMatching = config.subsetMatching !== false;
+  const subsetMinClasses = Math.max(2, Number(config.subsetMinClasses) || 4);
+
+  const exactLookup = new Map();
+  const preparedMappings = [];
+
+  for (const m of activeMappings || []) {
+    if (!m || !m.canonicalKey || !m.finalName) continue;
+    const propGroups =
+      m.propGroups instanceof Set
+        ? m.propGroups
+        : new Set(
+            partitionAndCanonicalize(m.canonicalKey, {
+              tailwindPrefix: config.tailwindPrefix || "",
+            }).applyableInfos.map((i) => i.propertyGroup)
+          );
+    const enriched = {
+      ...m,
+      canonicalTokens: m.canonicalTokens || splitClassTokens(m.canonicalKey),
+      propGroups,
+    };
+    exactLookup.set(enriched.canonicalKey, enriched);
+    preparedMappings.push(enriched);
+  }
+
+  // Prefer largest patterns first for subset matching
+  preparedMappings.sort((a, b) => b.canonicalTokens.length - a.canonicalTokens.length);
+
+  const edits = [];
+
+  for (const occ of scanned.occurrences) {
+    if (occ.canonicalTokens.length === 0) continue;
+
+    let chosen = null;
+    let residualTokens = [];
+    let isExact = false;
+
+    // 1. Exact canonical match
+    if (exactLookup.has(occ.canonicalKey)) {
+      chosen = exactLookup.get(occ.canonicalKey);
+      isExact = true;
+    } else if (subsetMatching) {
+      // 2. Conflict-free subset match
+      for (const candidate of preparedMappings) {
+        const minReq =
+          candidate.nameSource === "dictionary" || candidate.nameSource === "existing-css"
+            ? Math.max(2, Number(config.minClasses) || 3)
+            : subsetMinClasses;
+        if (candidate.canonicalTokens.length < minReq) continue;
+
+        const compat = checkSubsetCompatibility(
+          candidate.canonicalTokens,
+          candidate.propGroups,
+          occ
+        );
+        if (compat.matches) {
+          chosen = candidate;
+          residualTokens = compat.residualTokens;
+          isExact = compat.isExact;
+          break;
+        }
+      }
+    }
+
+    if (!chosen) continue;
+
+    // Deduplicate tokens while keeping semantic class first, then residual utilities, then inline hooks (`group`, `js-*`)
+    const nextTokens = [];
+    const seen = new Set();
+    for (const tok of [chosen.finalName, ...residualTokens, ...occ.inlineTokens]) {
+      if (tok && !seen.has(tok)) {
+        seen.add(tok);
+        nextTokens.push(tok);
+      }
+    }
+
+    const replacementSlice = `${occ.leadingWs}${nextTokens.join(" ")}${occ.trailingWs}`;
+    if (replacementSlice === occ.rawValue) continue;
+
+    edits.push({
+      line: occ.line,
+      column: occ.column,
+      valueStart: occ.valueStart,
+      valueEnd: occ.valueEnd,
+      before: occ.rawValue,
+      after: replacementSlice,
+      appliedClass: chosen.finalName,
+      patternId: chosen.id,
+      isExact,
+    });
+  }
+
+  if (edits.length === 0) {
+    return {
+      file: relFile,
+      changed: false,
+      output: source,
+      edits: [],
+      replacementsCount: 0,
+      bytesSaved: 0,
+    };
+  }
+
+  // Apply non-overlapping edits from back to front so offsets stay exact
+  const descending = [...edits].sort((a, b) => b.valueStart - a.valueStart);
+  let output = source;
+  let lastStart = Infinity;
+
+  for (const edit of descending) {
+    if (edit.valueEnd > lastStart) continue;
+    output = output.slice(0, edit.valueStart) + edit.after + output.slice(edit.valueEnd);
+    lastStart = edit.valueStart;
+  }
+
+  return {
+    file: relFile,
+    changed: output !== source,
+    output,
+    edits,
+    replacementsCount: edits.length,
+    bytesSaved: Buffer.byteLength(source, "utf8") - Buffer.byteLength(output, "utf8"),
+  };
+}
+
+/**
+ * Expand centralized TailClass names in a source string back into their
+ * original inline Tailwind CSS utilities.
+ *
+ * @param {string} source
+ * @param {string} filePath
+ * @param {Map<string, string> | Record<string, string>} classToUtilities
+ * @param {Record<string, any>} [config]
+ */
+function revertSource(source, filePath, classToUtilities, config = {}) {
+  const relFile = toPosixPath(filePath);
+  const map =
+    classToUtilities instanceof Map
+      ? classToUtilities
+      : new Map(Object.entries(classToUtilities || {}));
+
+  if (map.size === 0) {
+    return { file: relFile, changed: false, output: source, edits: [], revertedCount: 0 };
+  }
+
+  const scanned = scanSource(source, relFile, {
+    ...config,
+    excludePatterns: [],
+    ignoreTags: ["script", "style"],
+    onlyTags: [],
+  });
+
+  const edits = [];
+
+  for (const occ of scanned.occurrences) {
+    const rawTokens = splitClassTokens(occ.rawValue);
+    let touched = false;
+    const expanded = [];
+    const seen = new Set();
+
+    for (const tok of rawTokens) {
+      if (map.has(tok)) {
+        touched = true;
+        for (const u of splitClassTokens(map.get(tok))) {
+          if (!seen.has(u)) {
+            seen.add(u);
+            expanded.push(u);
+          }
+        }
+      } else if (!seen.has(tok)) {
+        seen.add(tok);
+        expanded.push(tok);
+      }
+    }
+
+    if (!touched) continue;
+
+    const after = `${occ.leadingWs}${expanded.join(" ")}${occ.trailingWs}`;
+    if (after === occ.rawValue) continue;
+
+    edits.push({
+      line: occ.line,
+      column: occ.column,
+      valueStart: occ.valueStart,
+      valueEnd: occ.valueEnd,
+      before: occ.rawValue,
+      after,
+    });
+  }
+
+  if (edits.length === 0) {
+    return { file: relFile, changed: false, output: source, edits: [], revertedCount: 0 };
+  }
+
+  const descending = [...edits].sort((a, b) => b.valueStart - a.valueStart);
+  let output = source;
+  let lastStart = Infinity;
+
+  for (const edit of descending) {
+    if (edit.valueEnd > lastStart) continue;
+    output = output.slice(0, edit.valueStart) + edit.after + output.slice(edit.valueEnd);
+    lastStart = edit.valueStart;
+  }
+
+  return {
+    file: relFile,
+    changed: output !== source,
+    output,
+    edits,
+    revertedCount: edits.length,
+  };
+}
+
+/**
+ * Apply resolved class mappings across a scanned project directory, write the
+ * centralized CSS stylesheet, and save the revert manifest (unless `dryRun` is true).
+ *
+ * @param {object} scanResult
+ * @param {Array<object>} resolvedMappings
+ * @param {Record<string, any>} config
+ * @param {{ dryRun?: boolean, backup?: boolean, version?: string }} [runOptions]
+ */
+function applyMappingsToProject(scanResult, resolvedMappings, config, runOptions = {}) {
+  const absRoot = scanResult.rootDir;
+  const dryRun = Boolean(runOptions.dryRun);
+  const backup = Boolean(runOptions.backup);
+  const outputCssPath = path.resolve(absRoot, config.outputCss || "tailclass.css");
+  const manifestPath = path.resolve(absRoot, config.manifestFile || ".tailclass-manifest.json");
+
+  let existingCssRules = new Map();
+  if (fs.existsSync(outputCssPath)) {
+    try {
+      existingCssRules = parseExistingStylesheet(fs.readFileSync(outputCssPath, "utf8"));
+    } catch {
+      // Ignore unreadable prior stylesheet
+    }
+  }
+
+  const finalMappings = mergeWithExistingCssRules(resolvedMappings, existingCssRules, config);
+
+  // Track real applied counts across files
+  const appliedCountByClass = new Map();
+  const appliedFilesByClass = new Map();
+
+  const fileEdits = [];
+  let totalReplacements = 0;
+  let totalBytesSaved = 0;
+
+  for (const relFile of scanResult.filesScanned) {
+    const fullPath = path.join(absRoot, relFile);
+    let source;
+    try {
+      source = fs.readFileSync(fullPath, "utf8");
+    } catch {
+      continue;
+    }
+    if (source.includes("\u0000")) continue;
+
+    const res = rewriteSource(source, relFile, finalMappings, config);
+    if (!res.changed) continue;
+
+    fileEdits.push(res);
+    totalReplacements += res.replacementsCount;
+    totalBytesSaved += res.bytesSaved;
+
+    for (const edit of res.edits) {
+      appliedCountByClass.set(
+        edit.appliedClass,
+        (appliedCountByClass.get(edit.appliedClass) || 0) + 1
+      );
+      if (!appliedFilesByClass.has(edit.appliedClass)) {
+        appliedFilesByClass.set(edit.appliedClass, new Set());
+      }
+      appliedFilesByClass.get(edit.appliedClass).add(relFile);
+    }
+
+    if (!dryRun) {
+      if (backup) {
+        const backupDest = path.join(absRoot, ".tailclass-backup", relFile);
+        fs.mkdirSync(path.dirname(backupDest), { recursive: true });
+        fs.writeFileSync(backupDest, source, "utf8");
+      }
+      fs.writeFileSync(fullPath, res.output, "utf8");
+    }
+  }
+
+  // Update metadata counts for accurate CSS header comments
+  for (const m of finalMappings) {
+    const newlyApplied = appliedCountByClass.get(m.finalName) || 0;
+    if (newlyApplied > m.timesFound) {
+      m.timesFound = newlyApplied;
+    }
+    const fSet = appliedFilesByClass.get(m.finalName);
+    if (fSet && fSet.size > (m.fileCount || 0)) {
+      m.fileCount = fSet.size;
+    }
+  }
+
+  const cssContent = generateStylesheet(finalMappings, {
+    cssFormat: config.cssFormat,
+    comments: config.comments,
+    groupByCategory: config.groupByCategory,
+    version: runOptions.version || "1.0.0",
+  });
+
+  if (!dryRun) {
+    fs.mkdirSync(path.dirname(outputCssPath), { recursive: true });
+    fs.writeFileSync(outputCssPath, cssContent, "utf8");
+
+    const mappingRecord = {};
+    for (const m of finalMappings) {
+      mappingRecord[m.finalName] = m.canonicalKey;
+    }
+
+    const manifestPayload = {
+      version: runOptions.version || "1.0.0",
+      updatedAt: new Date().toISOString(),
+      outputCss: toPosixPath(path.relative(absRoot, outputCssPath)),
+      filesModified: fileEdits.map((f) => f.file),
+      mappings: mappingRecord,
+    };
+
+    fs.writeFileSync(manifestPath, JSON.stringify(manifestPayload, null, 2) + "\n", "utf8");
+  }
+
+  return {
+    dryRun,
+    outputCssPath,
+    manifestPath,
+    cssContent,
+    activeMappings: finalMappings,
+    filesModified: fileEdits,
+    totalFilesModified: fileEdits.length,
+    totalReplacements,
+    totalBytesSaved,
+  };
+}
+
+/**
+ * Revert centralized TailClass classes across a project back to inline Tailwind
+ * utilities using `.tailclass-manifest.json` and/or `tailclass.css`.
+ *
+ * @param {string} rootDir
+ * @param {Record<string, any>} config
+ * @param {{ dryRun?: boolean, clean?: boolean, filesScanned?: string[] }} [options]
+ */
+function revertProjectFiles(rootDir, config, options = {}) {
+  const absRoot = path.resolve(rootDir || ".");
+  const dryRun = Boolean(options.dryRun);
+  const clean = Boolean(options.clean);
+  const manifestPath = path.resolve(absRoot, config.manifestFile || ".tailclass-manifest.json");
+  const outputCssPath = path.resolve(absRoot, config.outputCss || "tailclass.css");
+
+  const classToUtilities = new Map();
+
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    for (const [k, v] of Object.entries(manifest.mappings || {})) {
+      classToUtilities.set(k, v);
+    }
+  }
+
+  if (fs.existsSync(outputCssPath)) {
+    const fromCss = parseExistingStylesheet(fs.readFileSync(outputCssPath, "utf8"));
+    for (const [k, v] of fromCss.entries()) {
+      if (!classToUtilities.has(k)) {
+        classToUtilities.set(k, v);
+      }
+    }
+  }
+
+  if (classToUtilities.size === 0) {
+    throw new Error(
+      `No TailClass manifest (${path.basename(manifestPath)}) or stylesheet (${path.basename(outputCssPath)}) found to revert from.`
+    );
+  }
+
+  const { findFiles } = require("./glob");
+  const candidateFiles =
+    options.filesScanned ||
+    findFiles(absRoot, {
+      include: config.include,
+      exclude: config.exclude,
+    });
+
+  const filesReverted = [];
+  let totalReverted = 0;
+
+  for (const relFile of candidateFiles) {
+    const fullPath = path.join(absRoot, relFile);
+    if (!fs.existsSync(fullPath)) continue;
+    const source = fs.readFileSync(fullPath, "utf8");
+    if (source.includes("\u0000")) continue;
+
+    const rev = revertSource(source, relFile, classToUtilities, config);
+    if (!rev.changed) continue;
+
+    filesReverted.push(rev);
+    totalReverted += rev.revertedCount;
+
+    if (!dryRun) {
+      fs.writeFileSync(fullPath, rev.output, "utf8");
+    }
+  }
+
+  if (!dryRun && clean) {
+    if (fs.existsSync(outputCssPath)) fs.unlinkSync(outputCssPath);
+    if (fs.existsSync(manifestPath)) fs.unlinkSync(manifestPath);
+  }
+
+  return {
+    dryRun,
+    filesReverted,
+    totalFilesReverted: filesReverted.length,
+    totalReverted,
+    classesExpanded: Array.from(classToUtilities.keys()),
+  };
+}
+
+module.exports = {
+  mergeWithExistingCssRules,
+  rewriteSource,
+  revertSource,
+  applyMappingsToProject,
+  revertProjectFiles,
+};

@@ -1,0 +1,61 @@
+name: Publish Package 📦 to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build_and_test:
+    name: Verify tag, lint, and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify git tag matches package.json version
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const lib = require("./src/index.js");
+            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, "");
+            if (tag !== pkg.version || tag !== lib.VERSION) {
+              console.error(`Tag ${tag} does not match package.json (${pkg.version}) / src (${lib.VERSION})`);
+              process.exit(1);
+            }
+            console.log(`Verified release version ${tag}`);
+          '
+      - name: Run lint and test suite
+        run: npm run check
+      - name: Pack tarball
+        run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-tarball
+          path: "*.tgz"
+
+  publish:
+    name: Publish to npm Registry
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/tailclass
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - name: Publish
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
