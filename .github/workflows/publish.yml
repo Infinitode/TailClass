@@ -5,12 +5,13 @@ on:
     tags:
       - "v*"
 
+# Least privilege at the workflow root; id-token: write is granted only to the publish job.
 permissions:
   contents: read
 
 jobs:
   build_and_test:
-    name: Verify tag, lint, and test
+    name: Verify tag, lint, and run full layout test suite
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Verify git tag matches package.json version
+      - name: Verify git tag matches package.json and library version
         run: |
           node -e '
             const pkg = require("./package.json");
@@ -31,22 +32,20 @@ jobs:
             }
             console.log(`Verified release version ${tag}`);
           '
-      - name: Run lint and test suite
+      - name: Run static checks, unit tests, and layout-integrity tests
         run: npm run check
-      - name: Pack tarball
-        run: npm pack
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-tarball
-          path: "*.tgz"
+      - name: Run sample site end-to-end demo
+        run: npm run demo
+      - name: Verify tarball contents
+        run: npm pack --dry-run
 
   publish:
-    name: Publish to npm Registry
+    name: Publish to npm with Verified Provenance
     needs: build_and_test
     runs-on: ubuntu-latest
-    environment:
-      name: npm
-      url: https://www.npmjs.com/package/tailclass
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,7 +54,7 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
-      - name: Publish
-        run: npm publish --access public
+      - name: Publish unscoped package with Sigstore provenance attestation
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

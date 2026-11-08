@@ -449,6 +449,7 @@ function scanSource(source, filePath, config = {}) {
 
   const occurrences = [];
   const coveredRanges = [];
+  const ignoredRanges = [];
   const existingCustomClasses = new Set();
   const utilityFrequency = new Map(); // utility -> { count, files: Set }
   const tagStack = [];
@@ -460,25 +461,32 @@ function scanSource(source, filePath, config = {}) {
     // Skip HTML comments <!-- ... -->
     if (source.startsWith("<!--", i)) {
       const end = source.indexOf("-->", i + 4);
-      i = end === -1 ? len : end + 3;
+      const nextIdx = end === -1 ? len : end + 3;
+      ignoredRanges.push([i, nextIdx]);
+      i = nextIdx;
       continue;
     }
 
     // Skip block comments /* ... */
     if (source[i] === "/" && source[i + 1] === "*") {
       const end = source.indexOf("*/", i + 2);
-      i = end === -1 ? len : end + 2;
+      const nextIdx = end === -1 ? len : end + 2;
+      ignoredRanges.push([i, nextIdx]);
+      i = nextIdx;
       continue;
     }
 
-    // Skip line comments in JS/TS/JSX/TSX
+    // Skip line comments in JS/TS/JSX/TSX (avoiding `https://` protocol slashes)
     if (
       (isScriptOnly || ext === ".jsx" || ext === ".tsx") &&
       source[i] === "/" &&
-      source[i + 1] === "/"
+      source[i + 1] === "/" &&
+      (i === 0 || source[i - 1] !== ":")
     ) {
       const nl = source.indexOf("\n", i + 2);
-      i = nl === -1 ? len : nl + 1;
+      const nextIdx = nl === -1 ? len : nl + 1;
+      ignoredRanges.push([i, nextIdx]);
+      i = nextIdx;
       continue;
     }
 
@@ -507,7 +515,9 @@ function scanSource(source, filePath, config = {}) {
         // Skip raw <style>...</style> blocks completely
         if (lowerTag === "style" && !parsedTag.selfClosing) {
           const closeStyle = source.toLowerCase().indexOf("</style>", parsedTag.tagEndIdx + 1);
-          i = closeStyle === -1 ? len : closeStyle + 8;
+          const nextIdx = closeStyle === -1 ? len : closeStyle + 8;
+          ignoredRanges.push([parsedTag.tagEndIdx + 1, nextIdx]);
+          i = nextIdx;
           continue;
         }
 
@@ -530,6 +540,15 @@ function scanSource(source, filePath, config = {}) {
           }
         }
 
+        // Skip raw RCDATA inside <textarea>...</textarea> so literal sample text is never rewritten
+        if (lowerTag === "textarea" && !parsedTag.selfClosing) {
+          const closeTa = source.toLowerCase().indexOf("</textarea>", parsedTag.tagEndIdx + 1);
+          const nextIdx = closeTa === -1 ? len : closeTa + 11;
+          ignoredRanges.push([parsedTag.tagEndIdx + 1, nextIdx]);
+          i = nextIdx;
+          continue;
+        }
+
         if (!parsedTag.selfClosing && !VOID_HTML_TAGS.has(lowerTag)) {
           tagStack.push({ tag: lowerTag, rawTag: parsedTag.tagName });
         }
@@ -543,11 +562,14 @@ function scanSource(source, filePath, config = {}) {
   }
 
   // Scan standalone helper calls (`clsx(...)`, `cn(...)`, `twMerge(...)`, `cva(...)`)
-  // outside already-recorded tag attribute ranges
+  // outside already-recorded tag attribute ranges and outside comments/<style>/<textarea>
   if (config.scanHelpers !== false) {
     HELPER_FN_RE.lastIndex = 0;
     let m;
     while ((m = HELPER_FN_RE.exec(source)) !== null) {
+      const inIgnored = ignoredRanges.some(([s, e]) => m.index >= s && m.index < e);
+      if (inIgnored) continue;
+
       const openParenIdx = m.index + m[0].length - 1;
       const closeParenIdx = skipBalancedParens(source, openParenIdx);
       const lits = extractStringLiteralsInRegion(source, openParenIdx + 1, closeParenIdx);
@@ -555,7 +577,10 @@ function scanSource(source, filePath, config = {}) {
         const alreadyCovered = coveredRanges.some(
           ([s, e]) => slice.valueStart >= s && slice.valueEnd <= e
         );
-        if (!alreadyCovered) {
+        const litIgnored = ignoredRanges.some(
+          ([s, e]) => slice.valueStart >= s && slice.valueEnd <= e
+        );
+        if (!alreadyCovered && !litIgnored) {
           recordClassSlice({
             slice: { ...slice, attrName: "helper", syntax: "helper" },
             rawTagName: "div",
@@ -603,9 +628,14 @@ function scanSource(source, filePath, config = {}) {
 
     const leadingMatch = slice.rawValue.match(/^(\s*)/);
     const trailingMatch = slice.rawValue.match(/(\s*)$/);
-    const leadingWs = leadingMatch ? leadingMatch[1] : "";
-    const trailingWs =
+    const rawLeading = leadingMatch ? leadingMatch[1] : "";
+    const rawTrailing =
       slice.rawValue.trim().length > 0 && trailingMatch ? trailingMatch[1] : "";
+
+    const leadingWs =
+      slice.syntax === "static" && rawLeading.includes("\n") ? "" : rawLeading;
+    const trailingWs =
+      slice.syntax === "static" && rawTrailing.includes("\n") ? "" : rawTrailing;
 
     const { line, column } = offsetToLineCol(lineStarts, slice.valueStart);
 

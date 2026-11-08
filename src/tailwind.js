@@ -103,10 +103,11 @@ const EXACT_UTILITIES = new Map([
 
 /**
  * Marker classes recognized by Tailwind that CANNOT be placed inside `@apply`
- * because they act as parent/sibling selector hooks (`group-hover:`, `peer-focus:`).
- * TailClass automatically keeps these inline on the element!
+ * because they act as parent/sibling/container selector hooks (`group-hover:`,
+ * `peer-focus:`, `@md/sidebar:`). TailClass automatically keeps these inline!
  */
-const NON_APPLYABLE_MARKERS = /^((?:group|peer)(?:\/[a-zA-Z0-9_-]+)?|dark)$/;
+const NON_APPLYABLE_MARKERS =
+  /^((?:group|peer)(?:\/[a-zA-Z0-9_-]+)?|@container\/[a-zA-Z0-9_-]+|dark)$/;
 
 /**
  * Ordered prefix rules: [regex, bucket, propertyGroupFnOrString]
@@ -135,11 +136,17 @@ const PREFIX_RULES = [
   [/^clear-(?:start|end|right|left|both|none)$/, 1, "clear"],
   [/^isolation-(?:isolate|auto)$/, 2, "isolation"],
   [/^object-(?:contain|cover|fill|none|scale-down|bottom|center|left|left-bottom|left-top|right|right-bottom|right-top|top|\[.+\])$/, 1, "object"],
-  [/^overflow-(?:auto|hidden|clip|visible|scroll|[xy]-(?:auto|hidden|clip|visible|scroll))$/, 1, "overflow"],
-  [/^overscroll-(?:auto|contain|none|[xy]-(?:auto|contain|none))$/, 1, "overscroll"],
+  [/^overflow-(?:auto|hidden|clip|visible|scroll|[xy]-(?:auto|hidden|clip|visible|scroll))$/, 1, (b) =>
+    b.startsWith("overflow-x-") ? "overflow-x" : b.startsWith("overflow-y-") ? "overflow-y" : "overflow"
+  ],
+  [/^overscroll-(?:auto|contain|none|[xy]-(?:auto|contain|none))$/, 1, (b) =>
+    b.startsWith("overscroll-x-") ? "overscroll-x" : b.startsWith("overscroll-y-") ? "overscroll-y" : "overscroll"
+  ],
 
   // 2: Positioning & Z-index
-  [/^(?:inset|inset-x|inset-y|top|right|bottom|left|start|end)-(?:[0-9.]+|px|auto|full|[0-9]+\/[0-9]+|\[.+\])$/, 2, (b) => b.split("-")[0]],
+  [/^(?:inset|inset-x|inset-y|top|right|bottom|left|start|end)-(?:[0-9.]+|px|auto|full|[0-9]+\/[0-9]+|\[.+\])$/, 2, (b) =>
+    b.startsWith("inset-x-") ? "inset-x" : b.startsWith("inset-y-") ? "inset-y" : b.split("-")[0]
+  ],
   [/^z-(?:[0-9]+|auto|\[.+\])$/, 2, "z"],
 
   // 3: Flexbox & Grid
@@ -206,14 +213,31 @@ const PREFIX_RULES = [
   [/^(?:from|via|to)-(?:inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|[0-9]+%|\[.+\])(?:\/[0-9.[\]%]+)?$/, 7, (b) => b.split("-")[0]],
 
   // 8: Borders, Rounded, Divide, Outline, Ring
-  [/^rounded(?:-(?:t|r|b|l|tl|tr|br|bl|s|e|ss|se|ee|es))?(?:-(?:none|xs|sm|md|lg|xl|2xl|3xl|4xl|full|\[.+\]))?$/, 8, "rounded"],
-  [/^border(?:-(?:x|y|s|e|t|r|b|l))?(?:-(?:0|2|4|8|\[.+\]))?$/, 8, "border-width"],
+  [/^rounded(?:-(?:t|r|b|l|tl|tr|br|bl|s|e|ss|se|ee|es))?(?:-(?:none|xs|sm|md|lg|xl|2xl|3xl|4xl|full|\[.+\]))?$/, 8, (b) => {
+    const m = b.match(/^rounded-(tl|tr|br|bl|ss|se|ee|es|t|r|b|l|s|e)(?:-|$)/);
+    return m ? `rounded-${m[1]}` : "rounded";
+  }],
+  [/^border(?:-(?:x|y|s|e|t|r|b|l))?(?:-(?:0|2|4|8|\[.+\]))?$/, 8, (b) => {
+    const m = b.match(/^border-(x|y|s|e|t|r|b|l)(?:-|$)/);
+    return m ? `border-width-${m[1]}` : "border-width";
+  }],
   [/^border-(?:solid|dashed|dotted|double|hidden|none|collapse|separate)$/, 8, "border-style"],
   [/^border-spacing-(?:(?:x-|y-)?(?:[0-9.]+|px|\[.+\]))$/, 8, "border-spacing"],
-  [/^border(?:-(?:x|y|s|e|t|r|b|l))?-(?:inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])(?:\/[0-9.[\]%]+)?$/, 8, "border-color"],
+  [/^border(?:-(?:x|y|s|e|t|r|b|l))?-(?:inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])(?:\/[0-9.[\]%]+)?$/, 8, (b) => {
+    const m = b.match(/^border-(x|y|s|e|t|r|b|l)-/);
+    return m ? `border-color-${m[1]}` : "border-color";
+  }],
   [/^divide-(?:[xy](?:-(?:0|2|4|8|reverse|\[.+\]))?|solid|dashed|dotted|double|none|(?:inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])(?:\/[0-9.[\]%]+)?)$/, 8, "divide"],
   [/^outline-(?:none|dashed|dotted|double|hidden|[0-9]+|offset-(?:[0-9]+|\[.+\])|(?:inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])(?:\/[0-9.[\]%]+)?)$/, 8, "outline"],
-  [/^(?:inset-)?ring-(?:0|1|2|4|8|inset|offset-(?:[0-9]+|inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])|(?:inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])(?:\/[0-9.[\]%]+)?)$/, 8, "ring"],
+  [/^(?:inset-)?ring-(?:0|1|2|4|8|inset|offset-(?:[0-9]+|inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])|(?:inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])(?:\/[0-9.[\]%]+)?)$/, 8, (b) => {
+    const clean = b.replace(/^inset-/, "");
+    if (/^ring-(?:0|1|2|4|8)$/.test(clean)) return b.startsWith("inset-") ? "inset-ring-width" : "ring-width";
+    if (clean === "ring-inset") return "ring-inset";
+    if (clean.startsWith("ring-offset-")) {
+      return /^ring-offset-[0-9]+$/.test(clean) ? "ring-offset-width" : "ring-offset-color";
+    }
+    return b.startsWith("inset-") ? "inset-ring-color" : "ring-color";
+  }],
 
   // 9: Effects, Shadows, Filters, Backdrop
   [/^(?:inset-)?shadow-(?:2xs|xs|sm|md|lg|xl|2xl|inner|none|(?:inherit|current|transparent|black|white|[a-z]+-(?:50|[1-9]00|950)|\[.+\])(?:\/[0-9.[\]%]+)?)$/, 9, "shadow"],
@@ -473,6 +497,7 @@ function classifyToken(rawToken, options = {}) {
 
   if (!negative && EXACT_UTILITIES.has(lookupBase)) {
     const [bucket, propGroup] = EXACT_UTILITIES.get(lookupBase);
+    const subPrio = computeSubPriority(propGroup);
     const variantSort = computeVariantSortKey(variants);
     const scopedGroup = variants.length ? `${variants.join(":")}:${propGroup}` : propGroup;
     return {
@@ -486,7 +511,8 @@ function classifyToken(rawToken, options = {}) {
       isMarker: false,
       bucket,
       propertyGroup: scopedGroup,
-      sortKey: `${variantSort}|${String(bucket).padStart(2, "0")}|${lookupBase}|${token}`,
+      cssAxes: expandCssAxes(scopedGroup),
+      sortKey: `${variantSort}|${String(bucket).padStart(2, "0")}.${subPrio}|${lookupBase}|${token}`,
     };
   }
 
@@ -494,6 +520,7 @@ function classifyToken(rawToken, options = {}) {
     if (regex.test(lookupBase)) {
       const baseGroup =
         typeof groupResolver === "function" ? groupResolver(lookupBase) : groupResolver;
+      const subPrio = computeSubPriority(baseGroup);
       const scopedGroup = variants.length ? `${variants.join(":")}:${baseGroup}` : baseGroup;
       const variantSort = computeVariantSortKey(variants);
       return {
@@ -507,7 +534,8 @@ function classifyToken(rawToken, options = {}) {
         isMarker: false,
         bucket,
         propertyGroup: scopedGroup,
-        sortKey: `${variantSort}|${String(bucket).padStart(2, "0")}|${negative ? "-" : ""}${lookupBase}|${token}`,
+        cssAxes: expandCssAxes(scopedGroup),
+        sortKey: `${variantSort}|${String(bucket).padStart(2, "0")}.${subPrio}|${negative ? "-" : ""}${lookupBase}|${token}`,
       };
     }
   }
@@ -540,6 +568,223 @@ function computeVariantSortKey(variants) {
     return known !== undefined ? `${String(known).padStart(2, "0")}:${v}` : `50:${v}`;
   });
   return `${variants.length}|${scores.join("+")}`;
+}
+
+/**
+ * Sub-priority (0..9) inside a bucket ensuring CSS shorthands ALWAYS emit
+ * before axis shorthands, which ALWAYS emit before single-side/corner longhands,
+ * and `text-<size>` emits before `leading-*` so line-height overrides win!
+ * @param {string} baseGroup
+ * @returns {number}
+ */
+function computeSubPriority(baseGroup) {
+  switch (baseGroup) {
+    // Positioning
+    case "position":
+      return 1;
+    case "inset":
+      return 2;
+    case "inset-x":
+    case "inset-y":
+      return 3;
+    case "top":
+    case "right":
+    case "bottom":
+    case "left":
+    case "start":
+    case "end":
+      return 4;
+    case "z":
+      return 5;
+
+    // Overflow & Overscroll
+    case "overflow":
+    case "overscroll":
+      return 4;
+    case "overflow-x":
+    case "overflow-y":
+    case "overscroll-x":
+    case "overscroll-y":
+      return 5;
+
+    // Gap
+    case "gap":
+      return 7;
+    case "gap-x":
+    case "gap-y":
+      return 8;
+
+    // Sizing
+    case "size":
+      return 1;
+    case "w":
+    case "h":
+      return 2;
+    case "min-w":
+    case "max-w":
+    case "min-h":
+    case "max-h":
+      return 3;
+
+    // Spacing: p -> px/py -> pt/pr/pb/pl, m -> mx/my -> mt/mr/mb/ml
+    case "p":
+      return 1;
+    case "px":
+    case "py":
+      return 2;
+    case "pt":
+    case "pr":
+    case "pb":
+    case "pl":
+    case "ps":
+    case "pe":
+      return 3;
+    case "m":
+      return 4;
+    case "mx":
+    case "my":
+      return 5;
+    case "mt":
+    case "mr":
+    case "mb":
+    case "ml":
+    case "ms":
+    case "me":
+      return 6;
+    case "space-x":
+    case "space-y":
+      return 7;
+
+    // Typography: font-size (`text-lg`) BEFORE `leading-*` so custom line-height is never clobbered
+    case "font-family":
+    case "font-weight":
+    case "font-style":
+      return 1;
+    case "text-size":
+      return 2;
+    case "leading":
+      return 3;
+    case "tracking":
+      return 4;
+    case "text-align":
+      return 5;
+    case "text-color":
+      return 6;
+
+    // Borders & Rounded: all-sides -> axis -> single-side/corner
+    case "rounded":
+      return 1;
+    case "rounded-t":
+    case "rounded-r":
+    case "rounded-b":
+    case "rounded-l":
+    case "rounded-s":
+    case "rounded-e":
+      return 2;
+    case "rounded-tl":
+    case "rounded-tr":
+    case "rounded-br":
+    case "rounded-bl":
+    case "rounded-ss":
+    case "rounded-se":
+    case "rounded-ee":
+    case "rounded-es":
+      return 3;
+    case "border-width":
+      return 4;
+    case "border-width-x":
+    case "border-width-y":
+    case "border-width-s":
+    case "border-width-e":
+      return 5;
+    case "border-width-t":
+    case "border-width-r":
+    case "border-width-b":
+    case "border-width-l":
+      return 6;
+    case "border-style":
+      return 7;
+    case "border-color":
+      return 8;
+    case "border-color-x":
+    case "border-color-y":
+    case "border-color-s":
+    case "border-color-e":
+    case "border-color-t":
+    case "border-color-r":
+    case "border-color-b":
+    case "border-color-l":
+      return 9;
+
+    // Transitions
+    case "transition":
+      return 1;
+    case "duration":
+      return 2;
+    case "ease":
+      return 3;
+    case "delay":
+      return 4;
+    default:
+      return 5;
+  }
+}
+
+const SHORTHAND_AXIS_MAP = Object.freeze({
+  p: ["pt", "pr", "pb", "pl"],
+  px: ["pl", "pr"],
+  py: ["pt", "pb"],
+  ps: ["pl", "pr"],
+  pe: ["pl", "pr"],
+  m: ["mt", "mr", "mb", "ml"],
+  mx: ["ml", "mr"],
+  my: ["mt", "mb"],
+  ms: ["ml", "mr"],
+  me: ["ml", "mr"],
+  inset: ["top", "right", "bottom", "left"],
+  "inset-x": ["left", "right"],
+  "inset-y": ["top", "bottom"],
+  start: ["left", "right"],
+  end: ["left", "right"],
+  size: ["w", "h"],
+  gap: ["gap-x", "gap-y"],
+  overflow: ["overflow-x", "overflow-y"],
+  overscroll: ["overscroll-x", "overscroll-y"],
+  "text-size": ["font-size", "leading"],
+  rounded: ["rounded-tl", "rounded-tr", "rounded-br", "rounded-bl"],
+  "rounded-t": ["rounded-tl", "rounded-tr"],
+  "rounded-r": ["rounded-tr", "rounded-br"],
+  "rounded-b": ["rounded-br", "rounded-bl"],
+  "rounded-l": ["rounded-tl", "rounded-bl"],
+  "rounded-s": ["rounded-tl", "rounded-tr", "rounded-br", "rounded-bl"],
+  "rounded-e": ["rounded-tl", "rounded-tr", "rounded-br", "rounded-bl"],
+  "border-width": ["border-width-t", "border-width-r", "border-width-b", "border-width-l"],
+  "border-width-x": ["border-width-l", "border-width-r"],
+  "border-width-y": ["border-width-t", "border-width-b"],
+  "border-width-s": ["border-width-l", "border-width-r"],
+  "border-width-e": ["border-width-l", "border-width-r"],
+  "border-color": ["border-color-t", "border-color-r", "border-color-b", "border-color-l"],
+  "border-color-x": ["border-color-l", "border-color-r"],
+  "border-color-y": ["border-color-t", "border-color-b"],
+  "border-color-s": ["border-color-l", "border-color-r"],
+  "border-color-e": ["border-color-l", "border-color-r"],
+});
+
+/**
+ * Expand a variant-scoped property group (e.g. `md:px` or `p`) into the
+ * underlying atomic CSS property axes it mutates so shorthand/longhand
+ * collisions are caught accurately.
+ * @param {string} scopedPropertyGroup
+ * @returns {string[]}
+ */
+function expandCssAxes(scopedPropertyGroup) {
+  if (!scopedPropertyGroup) return [];
+  const lastColon = scopedPropertyGroup.lastIndexOf(":");
+  const variantScope = lastColon === -1 ? "" : scopedPropertyGroup.slice(0, lastColon + 1);
+  const baseProp =
+    lastColon === -1 ? scopedPropertyGroup : scopedPropertyGroup.slice(lastColon + 1);
+  const leaves = SHORTHAND_AXIS_MAP[baseProp] || [baseProp];
+  return leaves.map((leaf) => `${variantScope}${leaf}`);
 }
 
 /**
@@ -608,6 +853,8 @@ module.exports = {
   splitClassTokens,
   splitTopLevelColons,
   classifyToken,
+  computeSubPriority,
+  expandCssAxes,
   partitionAndCanonicalize,
   canonicalizeClasses,
 };

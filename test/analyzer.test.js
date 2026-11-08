@@ -76,7 +76,7 @@ test("scanner safely skips dynamic interpolation fragments while extracting stat
   assert.equal(analysis.extractablePatterns.length, 1);
   assert.equal(
     analysis.extractablePatterns[0].canonicalKey,
-    "p-4 border-l-4 rounded-lg shadow-sm"
+    "p-4 rounded-lg border-l-4 shadow-sm"
   );
 });
 

@@ -2,7 +2,7 @@
 
 const crypto = require("node:crypto");
 const { assignUniqueNames } = require("./namer");
-const { partitionAndCanonicalize } = require("./tailwind");
+const { expandCssAxes, partitionAndCanonicalize } = require("./tailwind");
 
 /**
  * Deterministic short pattern ID derived from the canonical Tailwind key.
@@ -15,8 +15,26 @@ function computePatternId(canonicalKey) {
 }
 
 /**
+ * Build expanded atomic CSS property axes set from a set of propertyGroups.
+ * @param {Set<string> | Iterable<string>} patternPropGroups
+ * @returns {Set<string>}
+ */
+function buildExpandedAxesSet(patternPropGroups) {
+  const axes = new Set();
+  for (const grp of patternPropGroups || []) {
+    axes.add(grp);
+    for (const leaf of expandCssAxes(grp)) {
+      axes.add(leaf);
+    }
+  }
+  return axes;
+}
+
+/**
  * Check whether `candidatePattern` can cleanly substitute into `occurrence`
- * as an exact match or conflict-free subset.
+ * as an exact match or conflict-free subset (verifying both exact property
+ * groups and shorthand/longhand CSS box-model axes such as `p` vs `px`,
+ * `rounded` vs `rounded-b`, and `text-lg` vs `leading-none`).
  *
  * @param {string[]} patternTokens
  * @param {Set<string>} patternPropGroups
@@ -40,13 +58,17 @@ function checkSubsetCompatibility(patternTokens, patternPropGroups, occurrence) 
     return { matches: true, isExact: true, residualTokens: [] };
   }
 
+  const expandedPatternAxes = buildExpandedAxesSet(patternPropGroups);
   const patSet = new Set(patternTokens);
   const residualTokens = [];
+
   for (const info of occurrence.applyableInfos) {
     if (!patSet.has(info.raw)) {
-      // Ensure residual utility does not collide on the exact same CSS property group
-      // unless it's a harmless spacing/sizing supplement
-      if (patternPropGroups.has(info.propertyGroup)) {
+      const infoAxes = info.cssAxes || expandCssAxes(info.propertyGroup);
+      if (
+        expandedPatternAxes.has(info.propertyGroup) ||
+        infoAxes.some((ax) => expandedPatternAxes.has(ax))
+      ) {
         return { matches: false, isExact: false, residualTokens: [] };
       }
       residualTokens.push(info.raw);

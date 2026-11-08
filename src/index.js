@@ -40,6 +40,8 @@ const { scanDirectory, scanSource } = require("./scanner");
 const {
   canonicalizeClasses,
   classifyToken,
+  computeSubPriority,
+  expandCssAxes,
   partitionAndCanonicalize,
   splitClassTokens,
 } = require("./tailwind");
@@ -234,6 +236,8 @@ module.exports = {
   revertSource,
   mergeWithExistingCssRules,
   classifyToken,
+  computeSubPriority,
+  expandCssAxes,
   canonicalizeClasses,
   partitionAndCanonicalize,
   splitClassTokens,

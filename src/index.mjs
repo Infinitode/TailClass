@@ -33,6 +33,8 @@ export const {
   revertSource,
   mergeWithExistingCssRules,
   classifyToken,
+  computeSubPriority,
+  expandCssAxes,
   canonicalizeClasses,
   partitionAndCanonicalize,
   splitClassTokens,

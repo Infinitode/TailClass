@@ -1,5 +1,7 @@
 # TailClass
 
+[![npm version](https://img.shields.io/npm/v/tailclass.svg?color=5d17eb)](https://www.npmjs.com/package/tailclass)
+[![npm provenance](https://img.shields.io/badge/provenance-verified-brightgreen.svg)](https://www.npmjs.com/package/tailclass)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-5d17eb.svg)](package.json)
 [![License: MIT Modified](https://img.shields.io/badge/license-MIT%20(Modified)-brightgreen.svg)](LICENSE)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-5d17eb.svg)](package.json)
