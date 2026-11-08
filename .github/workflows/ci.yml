@@ -19,7 +19,7 @@ jobs:
     name: Lint & Schema Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -37,7 +37,7 @@ jobs:
         # Full interpreter matrix on master/main; PRs run Node 22 for fast feedback.
         node-version: ${{ (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && fromJSON('["18", "20", "22"]') || fromJSON('["22"]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -54,7 +54,7 @@ jobs:
     needs: [lint, test]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@v4
