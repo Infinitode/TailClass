@@ -1,4 +1,4 @@
-name: Publish Package 📦 to npm
+name: Publish Package 📦 to npm (Trusted Publishing OIDC)
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
       - name: Verify git tag matches package.json and library version
         run: |
           node -e '
@@ -40,21 +40,21 @@ jobs:
         run: npm pack --dry-run
 
   publish:
-    name: Publish to npm with Verified Provenance
+    name: Publish to npm via OIDC Trusted Publisher
     needs: build_and_test
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Required for npm OIDC Trusted Publishing & automatic provenance
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
-      - name: Publish unscoped package with Sigstore provenance attestation
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Ensure latest npm CLI with OIDC Trusted Publishing support
+        run: npm install -g npm@latest
+      - name: Publish via OIDC (no NPM_TOKEN required; provenance is automatic)
+        run: npm publish --access public

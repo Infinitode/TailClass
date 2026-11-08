@@ -35,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         # Full interpreter matrix on master/main; PRs run Node 22 for fast feedback.
-        node-version: ${{ (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && fromJSON('["18", "20", "22"]') || fromJSON('["22"]') }}
+        node-version: ${{ (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && fromJSON('["18", "20", "22", "24"]') || fromJSON('["22"]') }}
     steps:
       - uses: actions/checkout@v4
         with:
