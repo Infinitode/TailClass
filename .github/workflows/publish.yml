@@ -14,10 +14,10 @@ jobs:
     name: Verify tag, lint, and run full layout test suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - name: Verify git tag matches package.json and library version
@@ -47,10 +47,10 @@ jobs:
       contents: read
       id-token: write # Required for npm OIDC Trusted Publishing & automatic provenance
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"

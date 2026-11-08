@@ -19,10 +19,10 @@ jobs:
     name: Lint & Schema Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: Run static checks
@@ -37,10 +37,10 @@ jobs:
         # Full interpreter matrix on master/main; PRs run Node 22 for fast feedback.
         node-version: ${{ (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && fromJSON('["18", "20", "22", "24"]') || fromJSON('["22"]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Run test suite
@@ -54,17 +54,17 @@ jobs:
     needs: [lint, test]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: Pack and verify distribution
         run: |
           npm pack --dry-run
           npm pack
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: npm-tarball
           path: "*.tgz"
