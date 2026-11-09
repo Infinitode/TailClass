@@ -13,7 +13,9 @@ const {
   loadConfigFile,
   resolveConfig,
   resolveWritablePath,
+  writeResolvedFile,
 } = require("./config");
+const { writeFileNoFollow } = require("./fs-safety");
 const {
   buildDictionaryPayload,
   formatClassListCsv,
@@ -76,16 +78,15 @@ function generateClassList(rootDir = ".", options = {}) {
   const absRoot = path.resolve(rootDir || ".");
   const { config, scan, analysis } = scanProject(absRoot, options);
 
-  const dictRelPath = options.dictionaryFile || config.dictionaryFile || "tailclass.map.json";
-  const dictionaryPath = resolveWritablePath(absRoot, dictRelPath, "dictionaryFile", {
-    ...config,
-    pathSources: {
-      ...(config.pathSources || {}),
-      // `options.dictionaryFile` is an explicit caller/CLI choice; config-derived
-      // values stay confined by resolveConfig.
-      dictionaryFile: options.dictionaryFile ? "cli" : config.pathSources?.dictionaryFile,
-    },
-  });
+  // `resolveConfig` has already merged `options.dictionaryFile` into the config
+  // and recorded its provenance; use that single checked resolver rather than
+  // re-resolving the raw string (which would bypass the symlink checks).
+  const dictionaryPath = resolveWritablePath(
+    absRoot,
+    config.dictionaryFile || "tailclass.map.json",
+    "dictionaryFile",
+    config
+  );
 
   let existingDictionary = null;
   if (options.merge !== false && fs.existsSync(dictionaryPath)) {
@@ -103,8 +104,13 @@ function generateClassList(rootDir = ".", options = {}) {
   });
 
   if (options.write !== false) {
-    fs.mkdirSync(path.dirname(dictionaryPath), { recursive: true });
-    fs.writeFileSync(dictionaryPath, JSON.stringify(dictionary, null, 2) + "\n", "utf8");
+    writeResolvedFile(
+      absRoot,
+      dictionaryPath,
+      "dictionaryFile",
+      config,
+      JSON.stringify(dictionary, null, 2) + "\n"
+    );
   }
 
   let reportPath = null;
@@ -119,8 +125,9 @@ function generateClassList(rootDir = ".", options = {}) {
         ? formatClassListCsv(dictionary)
         : formatClassListMarkdown(dictionary);
     if (options.write !== false) {
-      fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-      fs.writeFileSync(reportPath, reportBody, "utf8");
+      writeResolvedFile(absRoot, reportPath, "reportFile", {
+        pathSources: { reportFile: "cli" },
+      }, reportBody);
     }
   }
 
@@ -150,9 +157,13 @@ function applyAutoClasses(rootDir = ".", options = {}) {
   if (options.dictionary) {
     dictionaryObj = loadDictionary(options.dictionary, absRoot);
   } else if (!options.ignoreDictionary) {
-    const defaultDictPath = path.resolve(
+    // The auto-discovered dictionary comes from the repository: use the same
+    // confined resolver as the writers so a symlink cannot redirect the read.
+    const defaultDictPath = resolveWritablePath(
       absRoot,
-      config.dictionaryFile || "tailclass.map.json"
+      config.dictionaryFile || "tailclass.map.json",
+      "dictionaryFile",
+      config
     );
     if (fs.existsSync(defaultDictPath)) {
       dictionaryObj = loadDictionary(defaultDictPath, absRoot);
@@ -191,6 +202,7 @@ function revertProject(rootDir = ".", options = {}) {
     ...revertProjectFiles(absRoot, config, {
       dryRun: Boolean(options.dryRun),
       clean: Boolean(options.clean),
+      force: Boolean(options.force),
     }),
   };
 }
@@ -214,7 +226,7 @@ function initConfig(rootDir = ".", options = {}) {
 
   const starter = createStarterConfig();
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  fs.writeFileSync(targetPath, JSON.stringify(starter, null, 2) + "\n", "utf8");
+  writeFileNoFollow(targetPath, JSON.stringify(starter, null, 2) + "\n");
   return { configPath: targetPath, config: starter };
 }
 

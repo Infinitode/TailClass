@@ -4,6 +4,78 @@ All notable changes to **TailClass** are documented here. The format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-11-09
+
+Security release. Fixes two escape hatches found during follow-up testing of the
+1.0.1 hardening. Upgrading is recommended for anyone running TailClass against
+repositories they did not author (including CI jobs on pull requests).
+
+### Security
+
+- **Symlink path traversal (High).** `outputCss`, `dictionaryFile` and
+  `manifestFile` were confined by a lexical `path.resolve()` check only. A
+  repository containing a directory symlink (for example `assets -> ../../.ssh`)
+  could therefore make `apply`/`list` write — or `revert --clean` delete — files
+  outside the project root even though the configured string never left it.
+  Config-derived paths are now checked component by component with
+  `lstat`/`realpath` against the **real** project root; a TailClass output file
+  may not be a symlink, and symlinks that resolve outside the root are rejected
+  before any write or deletion. Writes use `O_NOFOLLOW`, re-validate after
+  creating parent directories, and never follow a symlink for the final
+  component. Backups under `.tailclass-backup/` and the auto-discovered
+  dictionary are covered as well. Symlinked **directories** whose real path
+  stays inside the root keep working.
+- **`revert --clean` arbitrary deletion (High).** `--clean` used to delete
+  whatever `outputCss`/`manifestFile` pointed at, without verifying ownership —
+  a hand-written stylesheet, an unrelated JSON file, or a file outside the root
+  reachable through a symlink. It now removes only files positively identified
+  as TailClass output (the generated header, or `@apply` rules matching an owned
+  manifest), and never a scanned source file, symlink or directory. Unowned
+  files are left in place and reported through `cleanupSkipped` plus a stderr
+  warning. `--force` never relaxes this rule.
+
+### Added
+
+- `src/fs-safety.js` — realpath-based confinement plus `writeFileNoFollow()` and
+  `unlinkRegularFile()` helpers.
+- `writeResolvedFile()` / `unlinkResolvedFile()` in `src/config.js`: every output
+  write and every `--clean` deletion goes through the checked resolver.
+- Generated manifests now carry `generator: "TailClass"` and `manifestPath`, so
+  `--clean` can still locate the files TailClass owns after a config change.
+- `revertProject()` returns `cleanedFiles` and `cleanupSkipped`.
+- Tests: `test/path-safety.test.js` (symlink escapes, ownership checks,
+  markerless `--no-comments` CSS, scanned-source protection, explicit CLI paths).
+
+### Changed
+
+- **Behavior change (symlinked output files).** In 1.0.1 a symlink at an output
+  path (for example `tailclass.css -> src/styles/generated.css`) was followed:
+  `apply`/`list` wrote through it and `revert --clean` removed the link. The
+  final component of every output path must now be a **regular file**. A
+  symlinked output file is rejected **even when its target is inside the
+  project root**, even with `--force`, and even when the path was supplied on the
+  command line; `--clean` also never deletes a symlink, wherever it points.
+  TailClass fails with `Refusing to write ... the target is a symlink ...`.
+  To migrate, replace the link with a regular file, or point `outputCss` /
+  `dictionaryFile` / `manifestFile` at the real file. Symlinked *directories*
+  in the middle of a path are unaffected as long as they resolve inside the
+  root (for example `outputCss: "styles/generated.css"` with
+  `styles -> ./src/styles`).
+- `revert --clean` reports the files it removed and warns on stderr about any
+  file it deliberately left untouched.
+- The error for a symlinked output file now says explicitly that the target must
+  be a regular file and how to migrate; it no longer suggests `--output`, which
+  is also rejected for symlinked output files. `--help` carries the same note.
+- Configuration schema, README and SECURITY.md document that config-supplied
+  paths may not traverse symlinks and that `--clean` only deletes owned files.
+
+### Fixed
+
+- `apply` no longer reads the auto-discovered dictionary through an unchecked
+  path, and `--backup` writes are confined to the project root.
+- `init` and source rewrites also refuse to follow a symlink at the final path
+  component.
+
 ## [1.0.1] — 2026-11-09
 
 Security & robustness hardening. All items are covered by regression tests. Upgrading from

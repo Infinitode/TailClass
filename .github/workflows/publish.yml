@@ -1,6 +1,6 @@
 name: Publish Package 📦 to npm (Trusted Publishing OIDC)
 
-# Triggered by pushing a release tag (e.g. `git push origin v1.0.1`).
+# Triggered by pushing a release tag (e.g. `git push origin v1.0.2`).
 # The tag must be created on a commit that is already on `main`, otherwise the
 # `build_and_test` job fails before anything is published.
 on:
