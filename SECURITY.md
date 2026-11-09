@@ -4,11 +4,32 @@ TailClass scans and rewrites source code files on disk when `tailclass apply` or
 `tailclass revert` is invoked. Correctness, path confinement, and deterministic
 rewriting are treated seriously.
 
+## Hardening guarantees
+
+TailClass treats the scanned project, including `tailclass.config.json` and
+`tailclass.map.json`, as **untrusted input**, because those files arrive with the
+repository you clone.
+
+- **Path confinement.** `outputCss`, `dictionaryFile` and `manifestFile` taken from a
+  configuration file must resolve inside the scanned project root; paths that escape it
+  are rejected before anything is written or deleted. Paths supplied explicitly on the
+  command line (`--output`, `--dict`, `--report`) are honoured as-is.
+- **No clobbering.** `apply` refuses to overwrite a scanned source file, or a
+  stylesheet/manifest that does not look like TailClass output, unless `--force` is
+  given.
+- **CSS payload validation.** Class tokens containing `;`, `{`, `}`, control characters
+  or comment terminators are kept inline on the element and never emitted into
+  `@apply`; selectors, comments and dictionary metadata are validated on output.
+- **Bounded matching.** Globs are matched with a backtracking-free algorithm, so
+  repository-supplied patterns cannot hang the process. Symlinks are never followed out
+  of the project.
+
 ## Supported versions
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x   | ✅        |
+| 1.0.1+  | ✅        |
+| 1.0.0   | ❌ superseded — upgrade for the v1.0.1 security fixes |
 | < 1.0   | ❌        |
 
 ## Reporting a vulnerability

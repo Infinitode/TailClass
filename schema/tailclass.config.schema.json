@@ -20,22 +20,22 @@
     "replaceDefaultExcludes": {
       "type": "boolean",
       "default": false,
-      "description": "When true, replaces built-in excludes (node_modules, dist, .git) instead of appending."
+      "description": "When true, replaces built-in excludes (dist, build, vendor, ...) instead of appending. `.git/`, `node_modules/` and `.tailclass-backup/` are always excluded."
     },
     "outputCss": {
       "type": "string",
       "default": "tailclass.css",
-      "description": "Output path for the generated centralized Tailwind CSS file."
+      "description": "Output path for the generated centralized Tailwind CSS file. Must stay inside the scanned project root when set from a configuration file."
     },
     "dictionaryFile": {
       "type": "string",
       "default": "tailclass.map.json",
-      "description": "Path for Class List Mode dictionary output and lookup."
+      "description": "Path for Class List Mode dictionary output and lookup. Must stay inside the scanned project root when set from a configuration file."
     },
     "manifestFile": {
       "type": "string",
       "default": ".tailclass-manifest.json",
-      "description": "Path for the revert manifest generated during apply."
+      "description": "Path for the revert manifest generated during apply. Must stay inside the scanned project root when set from a configuration file."
     },
     "cssFormat": {
       "type": "string",
@@ -81,7 +81,7 @@
     "classPrefix": {
       "type": "string",
       "default": "",
-      "description": "Prefix prepended to every generated semantic class name (e.g. 'tc-')."
+      "description": "Prefix prepended to every generated semantic class name (e.g. 'tc-'). Only letters, digits, '-' and '_' are allowed; the resulting class name may not start with a digit."
     },
     "namingStyle": {
       "type": "string",

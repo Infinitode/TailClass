@@ -1,5 +1,7 @@
 "use strict";
 
+const { isCssSafeToken } = require("./css-safety");
+
 /**
  * Exact single-token Tailwind CSS v3 & v4 utilities.
  * Mapped to [bucket, propertyGroup].
@@ -286,7 +288,7 @@ const PREFIX_RULES = [
  * container queries, aria/data/supports/has, arbitrary variants).
  */
 const VALID_VARIANT_RE =
-  /^(?:sm|md|lg|xl|2xl|max-(?:sm|md|lg|xl|2xl|\[.+\])|min-\[.+\]|@[a-z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?|hover|focus|focus-within|focus-visible|active|visited|target|first|last|only|odd|even|first-of-type|last-of-type|only-of-type|empty|disabled|enabled|checked|indeterminate|default|optional|required|valid|invalid|user-valid|user-invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|before|after|first-letter|first-line|marker|selection|file|backdrop|placeholder|details-content|dark|light|print|portrait|landscape|motion-safe|motion-reduce|contrast-more|contrast-less|forced-colors|inverted-colors|noscript| pointer-fine|pointer-coarse|any-pointer-fine|any-pointer-coarse|ltr|rtl|starting|inert|(?:group|peer|has|in|not)-(?:[a-z0-9-]+|\[.+\])(?:\/[a-zA-Z0-9_-]+)?|(?:aria|data|supports|nth|nth-last|nth-of-type|nth-last-of-type)-(?:[a-z0-9-]+|\[.+\])|\*|\*\*|\[.+\])$/;
+  /^(?:sm|md|lg|xl|2xl|max-(?:sm|md|lg|xl|2xl|\[.+\])|min-\[.+\]|@[a-z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?|hover|focus|focus-within|focus-visible|active|visited|target|first|last|only|odd|even|first-of-type|last-of-type|only-of-type|empty|disabled|enabled|checked|indeterminate|default|optional|required|valid|invalid|user-valid|user-invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|before|after|first-letter|first-line|marker|selection|file|backdrop|placeholder|details-content|dark|light|print|portrait|landscape|motion-safe|motion-reduce|contrast-more|contrast-less|forced-colors|inverted-colors|noscript|pointer-fine|pointer-coarse|any-pointer-fine|any-pointer-coarse|ltr|rtl|starting|inert|(?:group|peer|has|in|not)-(?:[a-z0-9-]+|\[.+\])(?:\/[a-zA-Z0-9_-]+)?|(?:aria|data|supports|nth|nth-last|nth-of-type|nth-last-of-type)-(?:[a-z0-9-]+|\[.+\])|\*|\*\*|\[.+\])$/;
 
 /**
  * Canonical ordering priority for variants so `sm:` comes before `md:`, `lg:`,
@@ -389,6 +391,27 @@ function classifyToken(rawToken, options = {}) {
       bucket: 99,
       propertyGroup: "custom",
       sortKey: "99|",
+    };
+  }
+
+  // Class tokens are ultimately written into `@apply` rules inside the generated
+  // stylesheet. Tokens carrying `;`, `{`, `}`, control characters or `*/` could
+  // terminate the declaration/rule (or the surrounding comment) and inject
+  // arbitrary CSS, so they are never treated as applyable Tailwind utilities.
+  // They are kept inline in the markup (and thus still work) instead.
+  if (!isCssSafeToken(token)) {
+    return {
+      raw: token,
+      variants: [],
+      base: token,
+      important: false,
+      negative: false,
+      isTailwind: false,
+      isApplyable: false,
+      isMarker: false,
+      bucket: 99,
+      propertyGroup: "custom",
+      sortKey: `99|${token}`,
     };
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "tailclass",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An open-source Tailwind CSS auto-classer that scans sites for repeated utility layouts, assigns smart semantic component names, supports custom mapping dictionaries, and generates a centralized stylesheet.",
   "keywords": [
     "tailwindcss",
@@ -53,7 +53,8 @@
     "schema/",
     "LICENSE",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "SECURITY.md"
   ],
   "engines": {
     "node": ">=18.0.0"

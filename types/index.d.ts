@@ -15,6 +15,10 @@ export interface CustomNamingRule {
 
 export interface TailClassConfig {
   configPath?: string;
+  /** Non-fatal configuration problems (unknown keys, coerced values). */
+  warnings?: string[];
+  /** Internal: where each writable path came from (`cli` | `config` | `default`). */
+  pathSources?: Partial<Record<"outputCss" | "dictionaryFile" | "manifestFile", string>>;
   include?: string[];
   exclude?: string[];
   replaceDefaultExcludes?: boolean;
@@ -101,6 +105,8 @@ export interface DictionaryPayload {
 export interface ApplyOptions extends TailClassConfig {
   dryRun?: boolean;
   backup?: boolean;
+  /** Allow overwriting an existing non-TailClass stylesheet/manifest. */
+  force?: boolean;
   dictionary?: string | Record<string, any>;
   ignoreDictionary?: boolean;
 }
@@ -116,6 +122,7 @@ export interface ClassListOptions extends TailClassConfig {
 export interface RevertOptions extends TailClassConfig {
   dryRun?: boolean;
   clean?: boolean;
+  force?: boolean;
 }
 
 export const NAME: string;
@@ -142,6 +149,7 @@ export function generateClassList(rootDir?: string, options?: ClassListOptions):
 };
 
 export function applyAutoClasses(rootDir?: string, options?: ApplyOptions): {
+  config: TailClassConfig;
   dryRun: boolean;
   usedDictionary: boolean;
   outputCssPath: string;
@@ -155,6 +163,7 @@ export function applyAutoClasses(rootDir?: string, options?: ApplyOptions): {
 };
 
 export function revertProject(rootDir?: string, options?: RevertOptions): {
+  config: TailClassConfig;
   dryRun: boolean;
   filesReverted: Array<Record<string, any>>;
   totalFilesReverted: number;

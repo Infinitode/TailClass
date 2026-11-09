@@ -1,5 +1,14 @@
 "use strict";
 
+const {
+  isCssSafeToken,
+  isValidClassIdentifier,
+  sanitizeCommentText,
+  sanitizeElementName,
+} = require("./css-safety");
+const { splitClassTokens } = require("./tailwind");
+const { VERSION } = require("./version");
+
 const CATEGORY_TITLES = {
   navigation: "Navigation & Headers",
   layout: "Page Layout & Containers",
@@ -73,7 +82,7 @@ function generateStylesheet(activeMappings, config = {}) {
   const format = config.cssFormat || "tailwind-v3";
   const showComments = config.comments !== false;
   const groupByCategory = config.groupByCategory !== false;
-  const version = config.version || "1.0.0";
+  const version = config.version || VERSION;
 
   const lines = [];
 
@@ -161,29 +170,42 @@ function emitGroups(lines, groups, { indent, showComments, useUtilityDirective }
     firstSection = false;
 
     if (showComments && group.title) {
-      lines.push(`${indent}/* === ${group.title} === */`);
+      lines.push(`${indent}/* === ${sanitizeCommentText(group.title)} === */`);
     }
 
     for (let i = 0; i < group.items.length; i++) {
       const m = group.items[i];
       if (i > 0) lines.push("");
 
+      // Selector and `@apply` payloads come from scanned markup / dictionary files,
+      // i.e. from repository content. Anything that could terminate the rule or the
+      // surrounding comment is rejected before it reaches the stylesheet.
+      const applyTokens = splitClassTokens(String(m.canonicalKey || "")).filter(isCssSafeToken);
+      if (!isValidClassIdentifier(m.finalName) || applyTokens.length === 0) {
+        if (showComments) {
+          const skipped = sanitizeCommentText(m.label || m.finalName) || "unnamed pattern";
+          lines.push(`${indent}/* Skipped unsafe class name or @apply payload: ${skipped} */`);
+        }
+        continue;
+      }
+
       if (showComments) {
+        const safeElements = (Array.isArray(m.elements) ? m.elements : [])
+          .map(sanitizeElementName)
+          .filter(Boolean);
         const elemHint =
-          Array.isArray(m.elements) && m.elements.length > 0
-            ? ` (${m.elements.map((e) => `<${e}>`).join(", ")})`
-            : "";
+          safeElements.length > 0 ? ` (${safeElements.map((e) => `<${e}>`).join(", ")})` : "";
         const countHint =
           typeof m.timesFound === "number" && m.timesFound > 0
-            ? ` — ${m.timesFound} occurrence${m.timesFound === 1 ? "" : "s"} across ${m.fileCount || 1} file${(m.fileCount || 1) === 1 ? "" : "s"}`
+            ? ` — ${Number(m.timesFound)} occurrence${m.timesFound === 1 ? "" : "s"} across ${Number(m.fileCount) || 1} file${(Number(m.fileCount) || 1) === 1 ? "" : "s"}`
             : "";
-        const label = m.label || m.finalName;
+        const label = sanitizeCommentText(m.label || m.finalName) || m.finalName;
         lines.push(`${indent}/* ${label}${countHint}${elemHint} */`);
       }
 
       const selector = useUtilityDirective ? `@utility ${m.finalName}` : `.${m.finalName}`;
       lines.push(`${indent}${selector} {`);
-      lines.push(`${indent}  @apply ${m.canonicalKey};`);
+      lines.push(`${indent}  @apply ${applyTokens.join(" ")};`);
       lines.push(`${indent}}`);
     }
   }
