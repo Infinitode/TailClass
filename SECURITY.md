@@ -14,9 +14,21 @@ repository you clone.
   configuration file must resolve inside the scanned project root; paths that escape it
   are rejected before anything is written or deleted. Paths supplied explicitly on the
   command line (`--output`, `--dict`, `--report`) are honoured as-is.
+- **Physical path confinement.** The root check is not merely lexical (`../`):
+  every existing component of an output path is `lstat`ed and resolved with
+  `realpath` against the real project root. A directory symlink planted in a cloned
+  repository (or a symlinked output file) can no longer redirect a write, read,
+  backup or `revert --clean` deletion outside the project. Writes use
+  `O_NOFOLLOW` and re-validate after creating parent directories; symlinks that
+  resolve inside the root are still allowed.
 - **No clobbering.** `apply` refuses to overwrite a scanned source file, or a
   stylesheet/manifest that does not look like TailClass output, unless `--force` is
   given.
+- **No arbitrary deletion.** `revert --clean` deletes only regular files TailClass
+  can positively identify as its own (generated CSS header, or `@apply` rules
+  matching an owned revert manifest). Foreign stylesheets, foreign JSON files,
+  scanned source files, symlinks and directories are left untouched and reported
+  via `cleanupSkipped`/stderr. `--force` does not override this.
 - **CSS payload validation.** Class tokens containing `;`, `{`, `}`, control characters
   or comment terminators are kept inline on the element and never emitted into
   `@apply`; selectors, comments and dictionary metadata are validated on output.
@@ -28,7 +40,8 @@ repository you clone.
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.1+  | ✅        |
+| 1.0.2+  | ✅        |
+| 1.0.1   | ❌ superseded — upgrade for the v1.0.2 symlink / `--clean` fixes |
 | 1.0.0   | ❌ superseded — upgrade for the v1.0.1 security fixes |
 | < 1.0   | ❌        |
 
@@ -54,7 +67,8 @@ window to ship a fix before any public disclosure.
 
 In scope:
 
-- arbitrary file overwrite or path traversal outside the target project root caused by crafted configuration or dictionary files;
+- arbitrary file overwrite, deletion or path traversal outside the target project root caused by crafted configuration, dictionary or manifest files — including symlink-based traversal;
+- deletion of non-TailClass files by `revert --clean`;
 - catastrophic backtracking (ReDoS) or denial of service in the markup scanner, glob matcher, or Tailwind token parser;
 - CSS injection or source corruption triggered by unsanitized dictionary values;
 - supply-chain issues in the repository's build or release workflows.

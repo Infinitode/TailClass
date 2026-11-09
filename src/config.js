@@ -4,6 +4,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { toPosixPath, MAX_GLOB_PATTERN_LENGTH } = require("./glob");
 const { sanitizeClassPrefix } = require("./css-safety");
+const {
+  assertNoSymlinkEscape,
+  ensureParentDirectory,
+  unlinkRegularFile,
+  writeFileNoFollow,
+} = require("./fs-safety");
 
 const DEFAULT_CONFIG = Object.freeze({
   include: [
@@ -170,6 +176,10 @@ function loadConfigFile(rootDir, explicitConfigPath) {
  * files, e.g. `"outputCss": "../../.bashrc"`). Paths typed on the command line
  * are explicit user intent and are therefore allowed to leave the root.
  *
+ * The check is both lexical (`../`) and physical (directory/file symlinks):
+ * `"outputCss": "link/escaped.css"` with `link -> ../../outside` also escapes,
+ * even though the string itself never leaves the root.
+ *
  * @param {unknown} value
  * @param {string} key
  * @param {string} absRoot
@@ -194,6 +204,16 @@ function validateOutputPath(value, key, absRoot) {
   if (/[\\/]$/.test(value)) {
     throw new Error(`Invalid ${key} "${value}": expected a file path, not a directory.`);
   }
+
+  try {
+    assertNoSymlinkEscape(absRoot, resolved, { key, value, operation: "write" });
+  } catch (err) {
+    if (!err.symlinkEscape) throw err;
+    throw new Error(
+      `Invalid ${key} "${value}": paths in the configuration file must stay inside the project root. ` +
+        `${err.message} Pass the path on the command line instead if you really need it outside (e.g. --output).`
+    );
+  }
   return value;
 }
 
@@ -210,32 +230,88 @@ function isInsideRoot(root, target) {
 }
 
 /**
- * Resolve a path that TailClass is about to write to, enforcing that
+ * Resolve a path that TailClass is about to write to (or delete), enforcing that
  * repository-supplied configuration cannot escape the project root.
  *
  * `resolveConfig` performs this check already; writers repeat it so the low-level
- * API is safe even when a caller builds a config object by hand.
+ * API is safe even when a caller builds a config object by hand. A caller that
+ * does not say where a path came from is treated as untrusted (`config`): only
+ * an explicit `pathSources[key] === "cli"` relaxes the root boundary.
+ *
+ * Beyond the lexical `../` check, every existing path component is resolved
+ * with `lstat`/`realpath`, so a symlinked directory or a symlinked output file
+ * cannot redirect a write (or a `revert --clean` deletion) outside the project.
  *
  * @param {string} absRoot
  * @param {unknown} value
  * @param {string} key
  * @param {Record<string, any>} [config]
+ * @param {"write" | "delete"} [operation]
  * @returns {string} absolute path
  */
-function resolveWritablePath(absRoot, value, key, config = {}) {
+function resolveWritablePath(absRoot, value, key, config = {}, operation = "write") {
   if (typeof value !== "string" || value.trim() === "" || value.includes("\u0000")) {
     throw new Error(`Invalid ${key}: expected a non-empty file path.`);
   }
   const resolved = path.resolve(absRoot, value);
   const source =
-    config && config.pathSources && config.pathSources[key] ? config.pathSources[key] : "cli";
-  if (source !== "cli" && !isInsideRoot(absRoot, resolved)) {
+    config && config.pathSources && config.pathSources[key] !== undefined
+      ? config.pathSources[key]
+      : "config";
+  const lexicallyInside = isInsideRoot(absRoot, resolved);
+
+  if (source !== "cli" && !lexicallyInside) {
     throw new Error(
-      `Refusing to write ${key} "${value}" outside the project root (${absRoot}). ` +
+      `Refusing to ${operation} ${key} "${value}" outside the project root (${absRoot}). ` +
         `Paths from configuration files must stay inside the project.`
     );
   }
+  // Even an explicit CLI path that lands inside the root must not be redirected
+  // through a symlink planted by the repository.
+  if (lexicallyInside) {
+    assertNoSymlinkEscape(absRoot, resolved, { key, value, operation });
+  }
   return resolved;
+}
+
+/**
+ * Write an output file through the checked resolver.
+ *
+ * The path is validated once more *after* the parent directories are created
+ * (so a component swapped in between cannot redirect the write), and the final
+ * `open()` refuses to follow a symlink.
+ *
+ * @param {string} absRoot
+ * @param {string} target absolute path previously returned by `resolveWritablePath`
+ * @param {string} key
+ * @param {Record<string, any>} config
+ * @param {string} content
+ * @returns {string} the validated absolute path
+ */
+function writeResolvedFile(absRoot, target, key, config, content) {
+  const checked = resolveWritablePath(absRoot, target, key, config);
+  ensureParentDirectory(path.dirname(checked));
+  resolveWritablePath(absRoot, checked, key, config);
+  writeFileNoFollow(checked, content);
+  return checked;
+}
+
+/**
+ * Delete an output file through the checked resolver. Only regular files are
+ * removed; symlinks, directories and special files are reported back to the
+ * caller instead of being followed.
+ *
+ * @param {string} absRoot
+ * @param {string} target absolute path previously returned by `resolveWritablePath`
+ * @param {string} key
+ * @param {Record<string, any>} config
+ * @param {string} [label]
+ * @returns {{ removed: boolean, reason: string | null }}
+ */
+function unlinkResolvedFile(absRoot, target, key, config, label = "file") {
+  const checked = resolveWritablePath(absRoot, target, key, config, "delete");
+  resolveWritablePath(absRoot, checked, key, config, "delete");
+  return unlinkRegularFile(checked, label);
 }
 
 /**
@@ -517,5 +593,7 @@ module.exports = {
   validateOutputPath,
   isInsideRoot,
   resolveWritablePath,
+  writeResolvedFile,
+  unlinkResolvedFile,
   createStarterConfig,
 };

@@ -121,7 +121,9 @@ export interface ClassListOptions extends TailClassConfig {
 
 export interface RevertOptions extends TailClassConfig {
   dryRun?: boolean;
+  /** Only remove files TailClass can verify it generated (unowned files are reported in `cleanupSkipped`). */
   clean?: boolean;
+  /** Applies to `apply` overwrites only; never allows `--clean` to delete foreign files. */
   force?: boolean;
 }
 
@@ -169,6 +171,10 @@ export function revertProject(rootDir?: string, options?: RevertOptions): {
   totalFilesReverted: number;
   totalReverted: number;
   classesExpanded: string[];
+  /** Absolute paths removed by `--clean`. */
+  cleanedFiles: string[];
+  /** Reasons why `--clean` deliberately left a file untouched. */
+  cleanupSkipped: string[];
 };
 
 export function initConfig(rootDir?: string, options?: { force?: boolean; fileName?: string }): {

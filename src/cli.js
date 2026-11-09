@@ -287,7 +287,7 @@ function formatHelpText(c) {
     `      --strict-dict             Only extract patterns explicitly listed in --dict`,
     `  -d, --dry-run                 Preview CSS & file changes without touching disk`,
     `      --backup                  Save original modified files under .tailclass-backup/`,
-    `      --force                   Overwrite a stylesheet/manifest TailClass does not own`,
+    `      --force                   Overwrite a non-TailClass stylesheet/manifest on "apply"`,
     `  -a, --all                     Include 1-off / non-repeated patterns in "list" mode`,
     `      --report <file>           Also export a .md or .csv report in "list" mode`,
     `      --format <mode>           CSS output format: tailwind-v3 | tailwind-v4 | plain`,
@@ -304,7 +304,7 @@ function formatHelpText(c) {
     `      --include-classes <globs> Only extract utilities matching these globs`,
     `      --ignore-tags <tags>      HTML/JSX tags to skip (e.g. "svg,code")`,
     `      --only-tags <tags>        Only auto-class specific tags (e.g. "nav,button,div")`,
-    `      --clean                   Delete tailclass.css and manifest after "revert"`,
+    `      --clean                   After "revert", delete only TailClass-owned output files`,
     `      --json                    Emit machine-readable JSON output`,
     `  -h, --help                    Display this help message`,
     `  -v, --version                 Display version number`,
@@ -673,6 +673,13 @@ function runCli(argv, io = {}) {
         force: Boolean(flags.force),
       });
       printConfigWarnings(writeErr, c, res.config);
+      // Surface skipped deletions on stderr in every mode, including `--json`
+      // (where stdout must stay machine-readable).
+      if (flags.clean && !res.dryRun) {
+        for (const note of res.cleanupSkipped || []) {
+          writeErr(c.yellow(`Warning: ${note}. --clean only removes files TailClass owns.`));
+        }
+      }
 
       if (flags.json) {
         write(JSON.stringify(res, null, 2));
@@ -687,7 +694,17 @@ function runCli(argv, io = {}) {
         )} file(s).`
       );
       if (flags.clean && !res.dryRun) {
-        write(`${c.green("✔")} Removed centralized stylesheet and manifest.`);
+        const removed = res.cleanedFiles || [];
+        const skipped = res.cleanupSkipped || [];
+        if (removed.length === 2 && skipped.length === 0) {
+          write(`${c.green("✔")} Removed centralized stylesheet and manifest.`);
+        } else if (removed.length > 0) {
+          write(
+            `${c.green("✔")} Removed ${removed.length} TailClass-generated file${
+              removed.length === 1 ? "" : "s"
+            } (${removed.map((f) => path.basename(f)).join(", ")}).`
+          );
+        }
       }
       return 0;
     }

@@ -25,17 +25,17 @@
     "outputCss": {
       "type": "string",
       "default": "tailclass.css",
-      "description": "Output path for the generated centralized Tailwind CSS file. Must stay inside the scanned project root when set from a configuration file."
+      "description": "Output path for the generated centralized Tailwind CSS file. Must stay inside the scanned project root when set from a configuration file, including when path components are symlinks; the target must be a regular file, not a symlink."
     },
     "dictionaryFile": {
       "type": "string",
       "default": "tailclass.map.json",
-      "description": "Path for Class List Mode dictionary output and lookup. Must stay inside the scanned project root when set from a configuration file."
+      "description": "Path for Class List Mode dictionary output and lookup. Must stay inside the scanned project root when set from a configuration file, including when path components are symlinks; the target must be a regular file, not a symlink."
     },
     "manifestFile": {
       "type": "string",
       "default": ".tailclass-manifest.json",
-      "description": "Path for the revert manifest generated during apply. Must stay inside the scanned project root when set from a configuration file."
+      "description": "Path for the revert manifest generated during apply. Must stay inside the scanned project root when set from a configuration file, including when path components are symlinks; the target must be a regular file, not a symlink. revert --clean only deletes manifests TailClass can verify it generated."
     },
     "cssFormat": {
       "type": "string",

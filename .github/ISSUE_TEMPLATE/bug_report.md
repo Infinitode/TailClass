@@ -30,7 +30,7 @@ If applicable, paste terminal output or screenshots to help explain your problem
  - OS: [e.g. Windows, macOS, Ubuntu]
  - OS version: [e.g. Windows 11 (x64)]
  - Node.js: [e.g. v22.11.0]
- - TailClass version: [e.g. 1.0.0]
+ - TailClass version: [e.g. 1.0.2]
  - Tailwind CSS version: [e.g. v3.4 / v4.0]
  - Framework (if relevant): [e.g. Plain HTML, React/Next.js, Vue, Svelte, Astro]
 
