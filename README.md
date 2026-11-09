@@ -7,7 +7,6 @@
 [![Dependencies](https://img.shields.io/badge/dependencies-0-5d17eb.svg)](package.json)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](.github/workflows/ci.yml)
 [![Security review](https://img.shields.io/badge/security-reviewed%20%C2%B7%20hardened-5d17eb.svg)](docs/security-review.md)
-[![Release](https://img.shields.io/badge/release-tag--driven-brightgreen.svg)](.github/workflows/publish.yml)
 [![GitHub stars](https://img.shields.io/github/stars/Infinitode/TailClass.svg)](https://github.com/Infinitode/TailClass/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/Infinitode/TailClass.svg)](https://github.com/Infinitode/TailClass/issues)
 
@@ -478,45 +477,6 @@ review ([`docs/security-review.md`](docs/security-review.md)):
 
 Full write-up, proofs of concept and regression tests: [`docs/security-review.md`](docs/security-review.md).
 Please report new issues privately via [SECURITY.md](SECURITY.md).
-
----
-
-## Releases & Versioning
-
-TailClass follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and keeps a
-single source of truth for its version in [`src/version.js`](src/version.js) (enforced
-against `package.json` by `npm run lint`).
-
-Releases are **tag-driven** and fully automated by
-[`.github/workflows/publish.yml`](.github/workflows/publish.yml). After merging the
-release commit into `main`:
-
-```bash
-git switch main
-git pull
-git tag -a v1.0.1 -m "TailClass v1.0.1"
-git push origin v1.0.1
-```
-
-Pushing the `v*` tag starts:
-
-1. **build_and_test** — verifies the tag is `vX.Y.Z`, that the tagged commit is on
-   `main`, that the tag matches `package.json` **and** `src/version.js`, then runs
-   `npm run check` (lint + unit, security and layout-integrity tests), the sample demo,
-   and `npm pack --dry-run`.
-2. **publish** — publishes to npm through [trusted publishing
-   (OIDC)](https://docs.npmjs.com/generating-provenance-statements) with automatic
-   provenance. No `NPM_TOKEN` secret is used or required.
-3. **release** — creates the matching GitHub Release with generated notes.
-
-Notes:
-
-- Tagging a commit that is **not** on `main` fails fast in step 1, so nothing is
-  published; the same happens if the tag and the version files disagree.
-- Re-pushing the same tag cannot double-publish: the workflow is serialised per tag and
-  the GitHub Release step is idempotent.
-- Renaming `.github/workflows/publish.yml` breaks npm trusted publishing, because the
-  filename is part of the publisher configuration on npmjs.com.
 
 ---
 

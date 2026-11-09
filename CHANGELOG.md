@@ -51,9 +51,6 @@ not author (including CI jobs on pull requests).
 - `VERSION` now lives in `src/version.js` and is reused by the generated stylesheet
   header, the revert manifest and the dictionary payload (previously three hard-coded
   `"1.0.0"` fallbacks could drift from `package.json`).
-- The tag-triggered publish workflow also creates a GitHub Release with generated notes,
-  refuses to run for tags whose commit is not on `main`, and is serialised with a
-  concurrency group so a re-pushed tag cannot publish twice.
 - Configuration is validated up front: array entries, numeric thresholds, booleans,
   enums and prefixes produce actionable errors (`Invalid exclude[1]: expected a string,
   received null`) instead of `TypeError`s, and JSON parse errors name the offending file.
