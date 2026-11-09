@@ -287,6 +287,7 @@ function formatHelpText(c) {
     `      --strict-dict             Only extract patterns explicitly listed in --dict`,
     `  -d, --dry-run                 Preview CSS & file changes without touching disk`,
     `      --backup                  Save original modified files under .tailclass-backup/`,
+    `      --force                   Overwrite a stylesheet/manifest TailClass does not own`,
     `  -a, --all                     Include 1-off / non-repeated patterns in "list" mode`,
     `      --report <file>           Also export a .md or .csv report in "list" mode`,
     `      --format <mode>           CSS output format: tailwind-v3 | tailwind-v4 | plain`,
@@ -316,6 +317,19 @@ function formatHelpText(c) {
     `  tailclass revert ./src --clean`,
     "",
   ].join("\n");
+}
+
+/**
+ * Emit configuration warnings on stderr so `--json` stdout stays machine-readable.
+ * @param {(msg?: string) => void} writeErr
+ * @param {ReturnType<typeof createPalette>} c
+ * @param {{ warnings?: string[] }} [config]
+ */
+function printConfigWarnings(writeErr, c, config) {
+  if (!config || !Array.isArray(config.warnings)) return;
+  for (const warning of config.warnings) {
+    writeErr(c.yellow(`Warning: ${warning}`));
+  }
 }
 
 function truncate(str, maxLen) {
@@ -392,7 +406,8 @@ function runCli(argv, io = {}) {
     }
 
     if (command === "scan") {
-      const { analysis } = scanProject(targetDir, overrides);
+      const { analysis, config } = scanProject(targetDir, overrides);
+      printConfigWarnings(writeErr, c, config);
       if (flags.json) {
         write(
           JSON.stringify(
@@ -457,10 +472,11 @@ function runCli(argv, io = {}) {
         reportFile: flags.reportFile,
       };
 
-      const { dictionary, dictionaryPath, reportPath } = generateClassList(
+      const { dictionary, dictionaryPath, reportPath, config } = generateClassList(
         targetDir,
         dictOptions
       );
+      printConfigWarnings(writeErr, c, config);
 
       if (flags.json) {
         write(JSON.stringify(dictionary, null, 2));
@@ -552,7 +568,9 @@ function runCli(argv, io = {}) {
         ignoreDictionary: Boolean(flags.ignoreDictionary),
         dryRun: Boolean(flags.dryRun),
         backup: Boolean(flags.backup),
+        force: Boolean(flags.force),
       });
+      printConfigWarnings(writeErr, c, res.config);
 
       if (flags.json) {
         write(
@@ -652,7 +670,9 @@ function runCli(argv, io = {}) {
         ...overrides,
         dryRun: Boolean(flags.dryRun),
         clean: Boolean(flags.clean),
+        force: Boolean(flags.force),
       });
+      printConfigWarnings(writeErr, c, res.config);
 
       if (flags.json) {
         write(JSON.stringify(res, null, 2));

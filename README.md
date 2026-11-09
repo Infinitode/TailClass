@@ -305,6 +305,25 @@ npx tailclass init
 }
 ```
 
+### Configuration Safety
+
+`tailclass.config.json` travels with the repository, so TailClass treats it as
+untrusted input:
+
+- `outputCss`, `dictionaryFile` and `manifestFile` **must stay inside the project root**
+  when they come from the config file (use `-o`/`--dict` on the command line for
+  deliberate out-of-root targets). `apply` additionally refuses to overwrite a scanned
+  source file, or a stylesheet/manifest that it does not own, unless `--force` is used.
+- Invalid values fail loudly with the offending key (`Invalid exclude[1]: expected a
+  string, received null`); unknown keys are reported as warnings on stderr.
+- Class tokens containing `;`, `{`, `}` or comment terminators are never emitted into
+  `@apply` — they simply stay inline on the element.
+- `.git/`, `node_modules/` and `.tailclass-backup/` are always excluded, even with
+  `replaceDefaultExcludes`.
+
+See [SECURITY.md](SECURITY.md) and the [security review](docs/security-review.md) for
+details.
+
 ### Opting Out Individual Elements Inline
 
 Add `tc-ignore` (or any token listed in `excludePatterns`) to keep an element untouched:
@@ -342,6 +361,7 @@ tailclass <command> [directory] [options]
 | `--strict-dict` | Only extract patterns explicitly present in `--dict`. |
 | `-d, --dry-run` | Preview edits and generated CSS without writing to disk. |
 | `--backup` | Back up original modified files into `.tailclass-backup/`. |
+| `--force` | Overwrite a stylesheet/manifest that does not look like TailClass output. |
 | `-a, --all` | Include non-repeated / 1-off patterns in `list` mode. |
 | `--report <file>` | Export Markdown (`.md`) or CSV (`.csv`) audit report in `list` mode. |
 | `--format <mode>` | CSS format: `tailwind-v3` (default), `tailwind-v4`, or `plain`. |

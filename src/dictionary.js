@@ -4,6 +4,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { computePatternId } = require("./analyzer");
 const { partitionAndCanonicalize } = require("./tailwind");
+const {
+  MAX_CLASS_NAME_LENGTH,
+  sanitizeCommentText,
+  sanitizeElementName,
+} = require("./css-safety");
 
 /**
  * Sanitize a user-provided custom CSS class name (preserving valid BEM `__`, `--`,
@@ -16,7 +21,23 @@ function sanitizeCustomClassName(rawName) {
     .trim()
     .replace(/^\.+/, "")
     .replace(/\s+/g, "-");
-  return trimmed.replace(/[^a-zA-Z0-9_-]/g, "");
+  const cleaned = trimmed.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, MAX_CLASS_NAME_LENGTH);
+  // `.123btn` (or `.-3d`) is not a valid CSS class selector, so give numeric
+  // names a valid prefix instead of silently emitting broken CSS.
+  return /^-?[0-9]/.test(cleaned) ? `tc-${cleaned}` : cleaned;
+}
+
+/**
+ * Normalise a dictionary-supplied category so it can safely be emitted inside a
+ * generated `/* === ... === *\/` section comment and in report tables.
+ * @param {unknown} rawCategory
+ * @returns {string}
+ */
+function sanitizeCategory(rawCategory) {
+  const clean = sanitizeCommentText(rawCategory, 40)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "");
+  return clean || "custom";
 }
 
 /**
@@ -207,14 +228,16 @@ function resolveActiveMappings(analysis, dictionary = null, config = {}) {
           subsetMatches: entry.subsetMatches || 0,
           fileCount: entry.fileCount || 0,
           files: entry.files || [],
-          elements: entry.elements || [],
+          elements: Array.isArray(entry.elements)
+            ? Array.from(new Set(entry.elements.map(sanitizeElementName).filter(Boolean)))
+            : [],
           occurrences: [],
           qualifies: true,
           autoName: entry.autoName || finalName,
           finalName,
           customName: custom,
-          category: entry.category || "custom",
-          label: entry.label || finalName,
+          category: sanitizeCategory(entry.category),
+          label: sanitizeCommentText(entry.label) || finalName,
           confidence: 1,
           nameSource: custom ? "dictionary" : "auto",
         });

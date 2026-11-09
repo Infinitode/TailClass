@@ -51,9 +51,11 @@
     "src/",
     "types/",
     "schema/",
+    "docs/",
     "LICENSE",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "SECURITY.md"
   ],
   "engines": {
     "node": ">=18.0.0"

@@ -12,6 +12,7 @@ const {
   createStarterConfig,
   loadConfigFile,
   resolveConfig,
+  resolveWritablePath,
 } = require("./config");
 const {
   buildDictionaryPayload,
@@ -75,7 +76,15 @@ function generateClassList(rootDir = ".", options = {}) {
   const { config, scan, analysis } = scanProject(absRoot, options);
 
   const dictRelPath = options.dictionaryFile || config.dictionaryFile || "tailclass.map.json";
-  const dictionaryPath = path.resolve(absRoot, dictRelPath);
+  const dictionaryPath = resolveWritablePath(absRoot, dictRelPath, "dictionaryFile", {
+    ...config,
+    pathSources: {
+      ...(config.pathSources || {}),
+      // `options.dictionaryFile` is an explicit caller/CLI choice; config-derived
+      // values stay confined by resolveConfig.
+      dictionaryFile: options.dictionaryFile ? "cli" : config.pathSources?.dictionaryFile,
+    },
+  });
 
   let existingDictionary = null;
   if (options.merge !== false && fs.existsSync(dictionaryPath)) {
@@ -99,7 +108,10 @@ function generateClassList(rootDir = ".", options = {}) {
 
   let reportPath = null;
   if (options.reportFile) {
-    reportPath = path.resolve(absRoot, options.reportFile);
+    // Reports are an explicit CLI/API destination, so they may live outside the root.
+    reportPath = resolveWritablePath(absRoot, options.reportFile, "reportFile", {
+      pathSources: { reportFile: "cli" },
+    });
     const ext = path.extname(reportPath).toLowerCase();
     const reportBody =
       ext === ".csv"
@@ -151,6 +163,7 @@ function applyAutoClasses(rootDir = ".", options = {}) {
   const result = applyMappingsToProject(scan, resolvedMappings, config, {
     dryRun: Boolean(options.dryRun),
     backup: Boolean(options.backup),
+    force: Boolean(options.force),
     version: VERSION,
   });
 
@@ -172,10 +185,13 @@ function applyAutoClasses(rootDir = ".", options = {}) {
 function revertProject(rootDir = ".", options = {}) {
   const absRoot = path.resolve(rootDir || ".");
   const config = resolveConfig(absRoot, options);
-  return revertProjectFiles(absRoot, config, {
-    dryRun: Boolean(options.dryRun),
-    clean: Boolean(options.clean),
-  });
+  return {
+    config,
+    ...revertProjectFiles(absRoot, config, {
+      dryRun: Boolean(options.dryRun),
+      clean: Boolean(options.clean),
+    }),
+  };
 }
 
 /**

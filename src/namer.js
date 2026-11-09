@@ -1,6 +1,7 @@
 "use strict";
 
 const { matchesAnyGlob } = require("./glob");
+const { sanitizeClassPrefix } = require("./css-safety");
 
 const DANGER_HUES = new Set(["red", "rose"]);
 const SUCCESS_HUES = new Set(["green", "emerald", "teal", "lime"]);
@@ -784,7 +785,9 @@ function sanitizeKebab(str) {
  */
 function formatClassName(kebabName, config = {}) {
   const clean = sanitizeKebab(kebabName);
-  const prefix = config.classPrefix || "";
+  // Sanitised again here (config validation rejects bad prefixes) so a hostile or
+  // malformed prefix can never reach a CSS selector or a markup class attribute.
+  const prefix = sanitizeClassPrefix(config.classPrefix || "");
   const style = config.namingStyle || "kebab";
 
   let formatted = clean;

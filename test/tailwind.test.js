@@ -84,3 +84,20 @@ test("partitionAndCanonicalize produces identical canonicalKey regardless of inp
     "flex items-center p-4 group js-card"
   );
 });
+
+test("classifyToken recognises every advertised pointer/hover-capability variant", () => {
+  for (const variant of ["pointer-fine", "pointer-coarse", "any-pointer-fine", "any-pointer-coarse"]) {
+    const info = classifyToken(`${variant}:underline`);
+    assert.equal(info.isTailwind, true, `${variant}: should be a Tailwind utility`);
+    assert.deepEqual(info.variants, [variant]);
+  }
+});
+
+test("classifyToken rejects tokens that would break out of an @apply declaration", () => {
+  for (const token of ["text-[red;}html{display:none}]", "p-4;}body{", "bg-white*/"]) {
+    const info = classifyToken(token);
+    assert.equal(info.isApplyable, false, token);
+    assert.equal(info.isTailwind, false, token);
+    assert.equal(info.propertyGroup, "custom");
+  }
+});

@@ -61,6 +61,36 @@ function offsetToLineCol(lineStarts, offset) {
 }
 
 /**
+ * Locate a closing tag (`</style>`, `</textarea>`, ...) case-insensitively while
+ * returning offsets that are valid for the *original* source string.
+ *
+ * Lower-casing a whole file to search for a closing tag is unsafe (some Unicode
+ * characters change length when lower-cased, shifting every later offset) and
+ * wasteful, so this helper uses an anchored, case-insensitive scan instead.
+ *
+ * @param {string} source
+ * @param {string} tagName
+ * @param {number} fromIdx
+ * @returns {number} index of `<` in the closing tag, or -1
+ */
+function findClosingTagIndex(source, tagName, fromIdx) {
+  const needle = `</${String(tagName).toLowerCase()}`;
+  const len = source.length;
+  let i = Math.max(0, fromIdx);
+
+  while (i < len) {
+    const idx = source.indexOf("</", i);
+    if (idx === -1) return -1;
+    const end = idx + needle.length;
+    if (end <= len && source.slice(idx, end).toLowerCase() === needle) {
+      if (end === len || /[\s>]/.test(source[end])) return idx;
+    }
+    i = idx + 1;
+  }
+  return -1;
+}
+
+/**
  * Advance past a JS/HTML quoted string starting at `quoteIdx`.
  * Returns the index of the closing quote, or `source.length` if unterminated.
  * @param {string} source
@@ -514,8 +544,8 @@ function scanSource(source, filePath, config = {}) {
 
         // Skip raw <style>...</style> blocks completely
         if (lowerTag === "style" && !parsedTag.selfClosing) {
-          const closeStyle = source.toLowerCase().indexOf("</style>", parsedTag.tagEndIdx + 1);
-          const nextIdx = closeStyle === -1 ? len : closeStyle + 8;
+          const closeStyle = findClosingTagIndex(source, "style", parsedTag.tagEndIdx + 1);
+          const nextIdx = closeStyle === -1 ? len : closeStyle + "</style>".length;
           ignoredRanges.push([parsedTag.tagEndIdx + 1, nextIdx]);
           i = nextIdx;
           continue;
@@ -542,8 +572,8 @@ function scanSource(source, filePath, config = {}) {
 
         // Skip raw RCDATA inside <textarea>...</textarea> so literal sample text is never rewritten
         if (lowerTag === "textarea" && !parsedTag.selfClosing) {
-          const closeTa = source.toLowerCase().indexOf("</textarea>", parsedTag.tagEndIdx + 1);
-          const nextIdx = closeTa === -1 ? len : closeTa + 11;
+          const closeTa = findClosingTagIndex(source, "textarea", parsedTag.tagEndIdx + 1);
+          const nextIdx = closeTa === -1 ? len : closeTa + "</textarea>".length;
           ignoredRanges.push([parsedTag.tagEndIdx + 1, nextIdx]);
           i = nextIdx;
           continue;

@@ -15,6 +15,26 @@ function computePatternId(canonicalKey) {
 }
 
 /**
+ * Memoised token sets for occurrences. Subset checks run in nested loops, so
+ * rebuilding a Set per comparison turns large sites quadratic for no reason.
+ * @type {WeakMap<object, Set<string>>}
+ */
+const occurrenceTokenSets = new WeakMap();
+
+/**
+ * @param {object} occurrence
+ * @returns {Set<string>}
+ */
+function getOccurrenceTokenSet(occurrence) {
+  let set = occurrenceTokenSets.get(occurrence);
+  if (!set) {
+    set = new Set(occurrence.canonicalTokens);
+    occurrenceTokenSets.set(occurrence, set);
+  }
+  return set;
+}
+
+/**
  * Build expanded atomic CSS property axes set from a set of propertyGroups.
  * @param {Set<string> | Iterable<string>} patternPropGroups
  * @returns {Set<string>}
@@ -47,7 +67,7 @@ function checkSubsetCompatibility(patternTokens, patternPropGroups, occurrence) 
     return { matches: false, isExact: false, residualTokens: [] };
   }
 
-  const occSet = new Set(occTokens);
+  const occSet = getOccurrenceTokenSet(occurrence);
   for (const t of patternTokens) {
     if (!occSet.has(t)) {
       return { matches: false, isExact: false, residualTokens: [] };
@@ -210,8 +230,9 @@ function analyzeScanResult(scanResult, config = {}) {
       if (maxClasses > 0 && pat.classCount > maxClasses) continue;
 
       const matchedOccs = [...pat.occurrences];
+      const alreadyMatched = new Set(pat.occurrences);
       for (const occ of unclaimed) {
-        if (pat.occurrences.includes(occ)) continue;
+        if (alreadyMatched.has(occ)) continue;
         const compat = checkSubsetCompatibility(pat.canonicalTokens, pat.propGroups, occ);
         if (compat.matches) {
           matchedOccs.push(occ);
