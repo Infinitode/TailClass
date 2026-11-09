@@ -6,10 +6,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.1] — 2026-11-09
 
-Security & robustness hardening. All items are covered by regression tests; see
-[`docs/security-review.md`](docs/security-review.md) for proofs of concept and rationale.
-Upgrading from 1.0.0 is recommended for anyone who runs TailClass on repositories they did
-not author (including CI jobs on pull requests).
+Security & robustness hardening. All items are covered by regression tests. Upgrading from
+1.0.0 is recommended for anyone who runs TailClass on repositories they did not author
+(including CI jobs on pull requests).
 
 ### Security
 

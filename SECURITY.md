@@ -24,9 +24,6 @@ repository you clone.
   repository-supplied patterns cannot hang the process. Symlinks are never followed out
   of the project.
 
-See [`docs/security-review.md`](docs/security-review.md) for the full review, findings
-and regression tests. The v1.0.1 release contains fixes for every finding in that review.
-
 ## Supported versions
 
 | Version | Supported |

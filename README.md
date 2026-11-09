@@ -6,7 +6,6 @@
 [![License: MIT Modified](https://img.shields.io/badge/license-MIT%20(Modified)-brightgreen.svg)](LICENSE)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-5d17eb.svg)](package.json)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Security review](https://img.shields.io/badge/security-reviewed%20%C2%B7%20hardened-5d17eb.svg)](docs/security-review.md)
 [![GitHub stars](https://img.shields.io/github/stars/Infinitode/TailClass.svg)](https://github.com/Infinitode/TailClass/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/Infinitode/TailClass.svg)](https://github.com/Infinitode/TailClass/issues)
 
@@ -322,8 +321,7 @@ untrusted input:
 - `.git/`, `node_modules/` and `.tailclass-backup/` are always excluded, even with
   `replaceDefaultExcludes`.
 
-See [SECURITY.md](SECURITY.md) and the [security review](docs/security-review.md) for
-details.
+See [SECURITY.md](SECURITY.md) for the hardening guarantees and disclosure process.
 
 ### Opting Out Individual Elements Inline
 
@@ -458,28 +456,6 @@ When multiple distinct patterns share an archetype, TailClass disambiguates by v
 
 ---
 
-## Security & Hardening (v1.0.1)
-
-TailClass reads repository content (`tailclass.config.json`, `tailclass.map.json`, an
-existing `tailclass.css`, and your markup) and then **writes files** — so everything it
-reads is treated as untrusted input. v1.0.1 ships the fixes from a full adversarial
-review ([`docs/security-review.md`](docs/security-review.md)):
-
-| Area | v1.0.1 behaviour |
-| --- | --- |
-| **Output paths** | `outputCss`, `dictionaryFile` and `manifestFile` from a config file must stay inside the project root — previously `"outputCss": "../../x.css"` could overwrite files outside the project, and `revert --clean` could delete them. CLI paths (`-o`, `--dict`, `--report`) stay unrestricted. |
-| **CSS payloads** | Tokens containing `;`, `{`, `}`, control characters or `*/` are never emitted into `@apply` (they stay inline on the element), closing CSS injection through arbitrary values such as `text-[red;}html{display:none}]`. |
-| **Glob matching** | Backtracking-free matcher: repository-supplied patterns like `**` repeated hundreds of times used to hang the process; they now finish in milliseconds. Malformed `[` classes degrade to literals instead of throwing. |
-| **Prefixes & dictionaries** | `classPrefix` is validated, dictionary `label`/`category`/`elements` are sanitized before reaching generated comments, and generated selectors are re-validated. |
-| **Overwrite protection** | `apply` refuses to overwrite a scanned source file, or a stylesheet/manifest that does not look like TailClass output, unless `--force` is passed. |
-| **Config validation** | Invalid values fail with the offending key (`Invalid exclude[1]: expected a string, received null`); unknown keys warn on stderr; JSON errors name the file. |
-| **Always excluded** | `.git/`, `node_modules/` and `.tailclass-backup/` are never scanned, even with `replaceDefaultExcludes`. |
-
-Full write-up, proofs of concept and regression tests: [`docs/security-review.md`](docs/security-review.md).
-Please report new issues privately via [SECURITY.md](SECURITY.md).
-
----
-
 ## Contributing
 
 Contributions, bug reports, and new UI naming heuristics are very welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a pull request.
@@ -488,8 +464,7 @@ Contributions, bug reports, and new UI naming heuristics are very welcome! Pleas
 
 Please review [SECURITY.md](SECURITY.md) for responsible disclosure instructions and the
 hardening guarantees TailClass upholds. Never report security vulnerabilities in public
-issues. See also the [security review](docs/security-review.md) for the findings fixed in
-v1.0.1.
+issues.
 
 ## License
 
