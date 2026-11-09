@@ -17,10 +17,16 @@ repository you clone.
 - **Physical path confinement.** The root check is not merely lexical (`../`):
   every existing component of an output path is `lstat`ed and resolved with
   `realpath` against the real project root. A directory symlink planted in a cloned
-  repository (or a symlinked output file) can no longer redirect a write, read,
-  backup or `revert --clean` deletion outside the project. Writes use
-  `O_NOFOLLOW` and re-validate after creating parent directories; symlinks that
-  resolve inside the root are still allowed.
+  repository can no longer redirect a write, read, backup or `revert --clean`
+  deletion outside the project. Writes use `O_NOFOLLOW` and re-validate after
+  creating parent directories. Symlinked *directories* whose real path stays inside
+  the root are still allowed.
+- **Output files must be regular files (behavior change in 1.0.2).** The final
+  component of any output path may not be a symlink, even if the link points to a
+  file inside the root, even with `--force`, and even for an explicit CLI path;
+  `revert --clean` likewise never unlinks a symlink. 1.0.1 followed such links.
+  Point the output at the real file instead. This prevents a symlink from being
+  used to clobber, read or delete a file TailClass did not intend to touch.
 - **No clobbering.** `apply` refuses to overwrite a scanned source file, or a
   stylesheet/manifest that does not look like TailClass output, unless `--force` is
   given.

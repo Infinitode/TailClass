@@ -312,11 +312,19 @@ untrusted input:
 
 - `outputCss`, `dictionaryFile` and `manifestFile` **must stay inside the project root**
   when they come from the config file (use `-o`/`--dict` on the command line for
-  deliberate out-of-root targets). This is a **physical** check: directory symlinks
-  and symlinked output files that escape the root are rejected, writes never follow a
-  symlink, and symlinks that resolve inside the root still work. `apply` additionally
-  refuses to overwrite a scanned source file, or a stylesheet/manifest that it does
-  not own, unless `--force` is used.
+  deliberate out-of-root targets). This is a **physical** check: every existing path
+  component is resolved with `lstat`/`realpath` against the real project root, so a
+  directory symlink cannot redirect a write outside the project. Symlinked
+  *directories* that resolve inside the root still work. `apply` additionally refuses
+  to overwrite a scanned source file, or a stylesheet/manifest that it does not own,
+  unless `--force` is used.
+- **Behavior change in v1.0.2:** an output path's final component must be a regular
+  file, **not a symlink** — even when the link points to a file inside the project
+  root, even with `--force`, and even for an explicit CLI path. 1.0.1 wrote through
+  such links; 1.0.2 fails with `Refusing to write ... the target is a symlink ...`,
+  and `revert --clean` never deletes a symlink. Replace the link with a regular file
+  or point `outputCss`/`dictionaryFile`/`manifestFile` at the real file. Intermediate
+  directory symlinks are unaffected.
 - `revert --clean` only deletes files TailClass can verify it generated; a foreign
   stylesheet, an unrelated JSON file, a scanned source file or a symlink is left
   untouched and reported as a warning. `--force` does not override this.

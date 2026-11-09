@@ -22,8 +22,11 @@ export interface TailClassConfig {
   include?: string[];
   exclude?: string[];
   replaceDefaultExcludes?: boolean;
+  /** Output paths must be regular files inside the project root when config-supplied; symlinked output files are rejected even if the link points inside the root (since 1.0.2). Symlinked directories that resolve inside the root are fine. */
   outputCss?: string;
+  /** @see outputCss */
   dictionaryFile?: string;
+  /** @see outputCss */
   manifestFile?: string;
   cssFormat?: CssFormat;
   minOccurrences?: number;

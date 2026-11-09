@@ -209,9 +209,15 @@ function validateOutputPath(value, key, absRoot) {
     assertNoSymlinkEscape(absRoot, resolved, { key, value, operation: "write" });
   } catch (err) {
     if (!err.symlinkEscape) throw err;
+    // The CLI hint only applies when a link actually leaves the root. A symlink
+    // *at the output path* is rejected for CLI paths too, so suggesting `-o`
+    // there would send the user in the wrong direction.
+    const cliHint = err.pathEscapesRoot
+      ? " Pass the path on the command line instead if you really need it outside (e.g. --output)."
+      : "";
     throw new Error(
       `Invalid ${key} "${value}": paths in the configuration file must stay inside the project root. ` +
-        `${err.message} Pass the path on the command line instead if you really need it outside (e.g. --output).`
+        `${err.message}${cliHint}`
     );
   }
   return value;

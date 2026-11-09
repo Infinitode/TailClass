@@ -23,7 +23,8 @@ repositories they did not author (including CI jobs on pull requests).
   before any write or deletion. Writes use `O_NOFOLLOW`, re-validate after
   creating parent directories, and never follow a symlink for the final
   component. Backups under `.tailclass-backup/` and the auto-discovered
-  dictionary are covered as well. Symlinks that stay inside the root keep working.
+  dictionary are covered as well. Symlinked **directories** whose real path
+  stays inside the root keep working.
 - **`revert --clean` arbitrary deletion (High).** `--clean` used to delete
   whatever `outputCss`/`manifestFile` pointed at, without verifying ownership —
   a hand-written stylesheet, an unrelated JSON file, or a file outside the root
@@ -47,8 +48,24 @@ repositories they did not author (including CI jobs on pull requests).
 
 ### Changed
 
+- **Behavior change (symlinked output files).** In 1.0.1 a symlink at an output
+  path (for example `tailclass.css -> src/styles/generated.css`) was followed:
+  `apply`/`list` wrote through it and `revert --clean` removed the link. The
+  final component of every output path must now be a **regular file**. A
+  symlinked output file is rejected **even when its target is inside the
+  project root**, even with `--force`, and even when the path was supplied on the
+  command line; `--clean` also never deletes a symlink, wherever it points.
+  TailClass fails with `Refusing to write ... the target is a symlink ...`.
+  To migrate, replace the link with a regular file, or point `outputCss` /
+  `dictionaryFile` / `manifestFile` at the real file. Symlinked *directories*
+  in the middle of a path are unaffected as long as they resolve inside the
+  root (for example `outputCss: "styles/generated.css"` with
+  `styles -> ./src/styles`).
 - `revert --clean` reports the files it removed and warns on stderr about any
   file it deliberately left untouched.
+- The error for a symlinked output file now says explicitly that the target must
+  be a regular file and how to migrate; it no longer suggests `--output`, which
+  is also rejected for symlinked output files. `--help` carries the same note.
 - Configuration schema, README and SECURITY.md document that config-supplied
   paths may not traverse symlinks and that `--clean` only deletes owned files.
 

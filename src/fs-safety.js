@@ -61,6 +61,11 @@ function realRootOf(absRoot) {
  * components are harmless: they are created as real directories by the caller,
  * which re-runs this check immediately before writing.
  *
+ * Deliberate behavior change in 1.0.2: only *directory* symlinks that resolve
+ * inside the root are allowed. A symlink at the final component is rejected
+ * regardless of where it points, because writing (or deleting) through it could
+ * affect a file TailClass did not intend to touch.
+ *
  * @param {string} absRoot
  * @param {string} resolved absolute, lexically inside `absRoot`
  * @param {{ key?: string, value?: string, operation?: string }} [options]
@@ -78,6 +83,7 @@ function assertNoSymlinkEscape(absRoot, resolved, options = {}) {
       `Refusing to ${operation} ${key} "${value}" outside the project root (${absRoot}).`
     );
     err.symlinkEscape = true;
+    err.pathEscapesRoot = true;
     throw err;
   }
 
@@ -109,12 +115,14 @@ function assertNoSymlinkEscape(absRoot, resolved, options = {}) {
             `whose target resolves outside the project root.`
         );
         err.symlinkEscape = true;
+        err.pathEscapesRoot = true;
         throw err;
       }
       if (isLast) {
         const err = new Error(
-          `Refusing to ${operation} ${key} "${value}": the target is a symlink (symbolic link); ` +
-            `TailClass output files must be regular files inside the project root.`
+          `Refusing to ${operation} ${key} "${value}": the target is a symlink (symbolic link). ` +
+            `TailClass output files must be regular files, even when the link points inside the project root. ` +
+            `Replace the symlink with a regular file or point ${key} at the real file.`
         );
         err.symlinkEscape = true;
         throw err;
@@ -160,7 +168,8 @@ function writeFileNoFollow(filePath, content) {
   if (st && st.isSymbolicLink()) {
     throw new Error(
       `Refusing to write through a symlink (symbolic link): ${filePath}. ` +
-        `TailClass output files must be regular files.`
+        `TailClass output files must be regular files even when the link points inside the project root; ` +
+        `replace the symlink or point the output at the real file.`
     );
   }
   if (st && st.isDirectory()) {
@@ -196,7 +205,7 @@ function unlinkRegularFile(filePath, label = "file") {
   if (st.isSymbolicLink()) {
     return {
       removed: false,
-      reason: `left ${label} ${filePath} untouched: it is a symlink (symbolic link)`,
+      reason: `left ${label} ${filePath} untouched: it is a symlink (symbolic link), even if its target is inside the project root`,
     };
   }
   if (!st.isFile()) {

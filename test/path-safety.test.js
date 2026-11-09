@@ -14,7 +14,7 @@ const {
   resolveConfig,
   revertProject,
 } = require("../src");
-const { resolveWritablePath, writeResolvedFile } = require("../src/config");
+const { resolveWritablePath, unlinkResolvedFile, writeResolvedFile } = require("../src/config");
 
 const NAV =
   "sticky top-0 flex items-center justify-between bg-white px-6 py-4 border-b border-slate-200";
@@ -144,6 +144,69 @@ test("revert --clean cannot delete an outside file through a symlinked directory
     assert.equal(read(precious), "DO NOT DELETE\n");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("behavior change: a symlinked output file is rejected even when its target is inside the root", { skip: SKIP_SYMLINKS }, () => {
+  const dir = tempDir("symlink-inside-file");
+  try {
+    writeFile(dir, "index.html", NAV_HTML);
+    const realCss = writeFile(dir, "real.css", "KEEP\n");
+    fs.symlinkSync(realCss, path.join(dir, "tailclass.css"), "file");
+
+    // 1.0.1 followed this link; 1.0.2 refuses it in config validation and in
+    // every workflow, including with --force and an explicit CLI path.
+    assert.throws(() => resolveConfig(dir), /symlink/);
+    assert.throws(() => applyAutoClasses(dir, { force: true }), /symlink/);
+    assert.throws(
+      () => applyAutoClasses(dir, { outputCss: path.join(dir, "tailclass.css") }),
+      /symlink/
+    );
+    // The error must be explicit and must not suggest a workaround that is also
+    // rejected (CLI-supplied symlinked output files are refused too).
+    assert.throws(
+      () => resolveConfig(dir),
+      /even when the link points inside the project root/
+    );
+    try {
+      resolveConfig(dir);
+      assert.fail("expected a symlink error");
+    } catch (err) {
+      assert.doesNotMatch(err.message, /Pass the path on the command line/);
+    }
+    assert.equal(read(realCss), "KEEP\n");
+    assert.equal(fs.lstatSync(path.join(dir, "tailclass.css")).isSymbolicLink(), true);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--clean never unlinks a symlink, wherever it points", { skip: SKIP_SYMLINKS }, () => {
+  const base = tempDir("symlink-clean-inside");
+  try {
+    const site = path.join(base, "site");
+    const outside = path.join(base, "outside");
+    fs.mkdirSync(site);
+    fs.mkdirSync(outside);
+    const realCss = writeFile(outside, "real.css", "KEEP\n");
+    const link = path.join(outside, "linked.css");
+    fs.symlinkSync(realCss, link, "file");
+
+    // An explicit CLI path outside the root skips root confinement, but the
+    // deletion helper still refuses to unlink the symlink itself.
+    const outcome = unlinkResolvedFile(
+      site,
+      link,
+      "outputCss",
+      { pathSources: { outputCss: "cli" } },
+      "stylesheet"
+    );
+    assert.equal(outcome.removed, false);
+    assert.match(outcome.reason || "", /symlink/);
+    assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
+    assert.equal(read(realCss), "KEEP\n");
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
   }
 });
 
