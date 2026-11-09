@@ -47,8 +47,9 @@ const {
   splitClassTokens,
 } = require("./tailwind");
 
+const { VERSION } = require("./version");
+
 const NAME = "TailClass";
-const VERSION = "1.0.0";
 
 /**
  * Scan and analyze a project directory without modifying any files.

@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { computePatternId } = require("./analyzer");
+const { VERSION } = require("./version");
 const { partitionAndCanonicalize } = require("./tailwind");
 const {
   MAX_CLASS_NAME_LENGTH,
@@ -102,7 +103,7 @@ function buildDictionaryPayload(analysis, options = {}) {
   const payload = {
     $schema:
       "https://raw.githubusercontent.com/Infinitode/TailClass/main/schema/tailclass.map.schema.json",
-    version: "1.0.0",
+    version: VERSION,
     generatedAt: new Date().toISOString(),
     instructions:
       "Type your preferred class name into 'customName' to override 'autoName', or set 'enabled' to false to skip a pattern. Apply with: tailclass apply --dict tailclass.map.json",

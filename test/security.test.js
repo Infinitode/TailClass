@@ -241,7 +241,7 @@ test("revert ignores manifest entries whose expansion could corrupt markup", () 
     dir,
     ".tailclass-manifest.json",
     JSON.stringify({
-      version: "1.0.0",
+      version: "1.0.1",
       mappings: {
         "tc-good": "flex p-4 m-2",
         "tc-evil": 'p-4" onmouseover="alert(1)',

@@ -1,6 +1,8 @@
 # TailClass security & robustness review
 
 **Scope:** `tailclass` v1.0.0 (commit `eacdffd`), Node.js 18–24.
+**Status:** every finding below is fixed in **v1.0.1** (see [`CHANGELOG.md`](../CHANGELOG.md));
+TCA-13 is an informational note on optional supply-chain hardening.
 **Method:** manual source review of `src/*`, adversarial testing of the CLI/library against
 crafted projects, and targeted timing/performance probes. All findings below were
 reproduced locally and are covered by regression tests.

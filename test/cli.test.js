@@ -8,6 +8,7 @@ const { Writable } = require("node:stream");
 const test = require("node:test");
 const { pathToFileURL } = require("node:url");
 const { runCli } = require("../src/cli");
+const { VERSION } = require("../src/version");
 
 function execCli(args) {
   let out = "";
@@ -29,10 +30,17 @@ function execCli(args) {
   return { code, out, err };
 }
 
+test("package.json, src/version.js and the CLI agree on the version", () => {
+  const pkg = require("../package.json");
+  assert.equal(VERSION, pkg.version);
+  assert.equal(require("../src").VERSION, pkg.version);
+});
+
 test("CLI --version, --help, and unknown flag handling", () => {
   const ver = execCli(["--version"]);
   assert.equal(ver.code, 0);
-  assert.match(ver.out, /TailClass v1\.0\.0/);
+  // Keep version assertions version-agnostic so a release bump never breaks the suite.
+  assert.equal(ver.out.trim(), `TailClass v${VERSION}`);
 
   const help = execCli(["--help"]);
   assert.equal(help.code, 0);

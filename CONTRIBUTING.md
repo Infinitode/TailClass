@@ -48,6 +48,30 @@ Thank you for considering contributing to **TailClass**! Contributions, whether 
    - Ensure your PR passes all automated CI checks.
    - Add an entry to `CHANGELOG.md` for user-visible changes.
 
+## Releasing
+
+Releases are tag-driven and automated — maintainers never publish from a laptop.
+
+1. Bump the version in **one place**: `src/version.js`, then mirror it into
+   `package.json` (the `npm run lint` check fails if they disagree) and move the
+   `CHANGELOG.md` section from `Unreleased` to the new version.
+2. Merge the release PR into `main` and let CI pass.
+3. Tag the merge commit and push the tag:
+
+```bash
+git switch main && git pull
+git tag -a v1.0.1 -m "TailClass v1.0.1"
+git push origin v1.0.1
+```
+
+4. `.github/workflows/publish.yml` verifies the tag (semver shape, tag is on `main`,
+   tag matches both version files), runs `npm run check` + the demo, publishes to npm
+   through OIDC trusted publishing with provenance, and creates the GitHub Release.
+
+Tags on commits that are not on `main`, or tags whose version does not match
+`src/version.js`, fail before anything is published. See
+[Releases & Versioning](README.md#releases--versioning) for details.
+
 ## Community Guidelines
 
 To maintain a positive and collaborative community, we ask that all contributors adhere to the following principles:

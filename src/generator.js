@@ -7,6 +7,7 @@ const {
   sanitizeElementName,
 } = require("./css-safety");
 const { splitClassTokens } = require("./tailwind");
+const { VERSION } = require("./version");
 
 const CATEGORY_TITLES = {
   navigation: "Navigation & Headers",
@@ -81,7 +82,7 @@ function generateStylesheet(activeMappings, config = {}) {
   const format = config.cssFormat || "tailwind-v3";
   const showComments = config.comments !== false;
   const groupByCategory = config.groupByCategory !== false;
-  const version = config.version || "1.0.0";
+  const version = config.version || VERSION;
 
   const lines = [];
 

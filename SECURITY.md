@@ -25,13 +25,14 @@ repository you clone.
   of the project.
 
 See [`docs/security-review.md`](docs/security-review.md) for the full review, findings
-and regression tests.
+and regression tests. The v1.0.1 release contains fixes for every finding in that review.
 
 ## Supported versions
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x   | ✅        |
+| 1.0.1+  | ✅        |
+| 1.0.0   | ❌ superseded — upgrade for the v1.0.1 security fixes |
 | < 1.0   | ❌        |
 
 ## Reporting a vulnerability

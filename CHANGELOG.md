@@ -4,10 +4,12 @@ All notable changes to **TailClass** are documented here. The format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.1] — 2026-11-09
 
 Security & robustness hardening. All items are covered by regression tests; see
 [`docs/security-review.md`](docs/security-review.md) for proofs of concept and rationale.
+Upgrading from 1.0.0 is recommended for anyone who runs TailClass on repositories they did
+not author (including CI jobs on pull requests).
 
 ### Security
 
@@ -46,6 +48,12 @@ Security & robustness hardening. All items are covered by regression tests; see
 
 ### Changed
 
+- `VERSION` now lives in `src/version.js` and is reused by the generated stylesheet
+  header, the revert manifest and the dictionary payload (previously three hard-coded
+  `"1.0.0"` fallbacks could drift from `package.json`).
+- The tag-triggered publish workflow also creates a GitHub Release with generated notes,
+  refuses to run for tags whose commit is not on `main`, and is serialised with a
+  concurrency group so a re-pushed tag cannot publish twice.
 - Configuration is validated up front: array entries, numeric thresholds, booleans,
   enums and prefixes produce actionable errors (`Invalid exclude[1]: expected a string,
   received null`) instead of `TypeError`s, and JSON parse errors name the offending file.
